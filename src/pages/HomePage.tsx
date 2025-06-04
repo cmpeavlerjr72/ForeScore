@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { EventConfig } from '../App';
 import { saveConfig, loadConfig, generateTripId } from '../utils/storage';
-import Dashboard from './Dashboard';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { GolfCourse, golfCourses } from '../types/GolfCourse';
 
 interface HomePageProps {
   config: EventConfig;
@@ -11,6 +12,7 @@ interface HomePageProps {
 }
 
 function HomePage({ config, setConfig }: HomePageProps) {
+  const navigate = useNavigate();
   const [tripIdInput, setTripIdInput] = useState('');
   const [pin, setPin] = useState('');
   const [isLeader, setIsLeader] = useState(false);
@@ -35,23 +37,23 @@ function HomePage({ config, setConfig }: HomePageProps) {
       playersPerTeam,
       numRounds,
       scoringMethods: ['match', 'match', 'match'],
+      courses: Array(numRounds).fill('True Blue'), // Default course for each round
       teams,
     };
   });
-  const [showDashboard, setShowDashboard] = useState(false);
 
   useEffect(() => {
     if (tripIdInput) {
       const savedConfig = loadConfig(tripIdInput);
       if (savedConfig) {
         setConfig(savedConfig);
-        setShowDashboard(true);
+        navigate('/dashboard');
         setError('');
       } else {
         setError('No trip found with this ID');
       }
     }
-  }, [tripIdInput, setConfig]);
+  }, [tripIdInput, setConfig, navigate]);
 
   const handleTripIdSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,6 +97,11 @@ function HomePage({ config, setConfig }: HomePageProps) {
         newScoringMethods[index] = value as 'match' | 'stroke';
         return { ...prev, scoringMethods: newScoringMethods };
       }
+      if (name === 'course' && index !== undefined) {
+        const newCourses = [...prev.courses];
+        newCourses[index] = value as string;
+        return { ...prev, courses: newCourses };
+      }
       const updatedValue = parseInt(value) || (typeof prev[name as keyof EventConfig] === 'number' ? prev[name as keyof EventConfig] as number : 0);
       let updatedTeams = prev.teams;
       if (name === 'numTeams' || name === 'playersPerTeam') {
@@ -128,12 +135,16 @@ function HomePage({ config, setConfig }: HomePageProps) {
           lineupOrder: player.lineupOrder.slice(0, newNumRounds).concat(Array(Math.max(0, newNumRounds - player.lineupOrder.length)).fill(0)),
         })),
       }));
+      const newCourses = prev.courses.slice(0, newNumRounds).concat(
+        Array(Math.max(0, newNumRounds - prev.courses.length)).fill('True Blue')
+      );
       return {
         ...prev,
         numRounds: newNumRounds,
         scoringMethods: prev.scoringMethods.slice(0, newNumRounds).concat(
           Array(Math.max(0, newNumRounds - prev.scoringMethods.length)).fill('match')
         ),
+        courses: newCourses,
         teams: newTeams,
       };
     });
@@ -145,7 +156,7 @@ function HomePage({ config, setConfig }: HomePageProps) {
     saveConfig(tempConfig);
     setShowSetupModal(false);
     setIsLeader(true);
-    setShowDashboard(true);
+    navigate('/dashboard');
     setError('');
   };
 
@@ -161,6 +172,15 @@ function HomePage({ config, setConfig }: HomePageProps) {
         return {
           ...prev,
           scoringMethods: newScoringMethods,
+          teams: prev.teams,
+        };
+      }
+      if (name === 'course' && index !== undefined) {
+        const newCourses = [...prev.courses];
+        newCourses[index] = value as string;
+        return {
+          ...prev,
+          courses: newCourses,
           teams: prev.teams,
         };
       }
@@ -220,10 +240,6 @@ function HomePage({ config, setConfig }: HomePageProps) {
     setError('');
   };
 
-  if (showDashboard && config.tripId) {
-    return <Dashboard config={config} setConfig={setConfig} setShowDashboard={setShowDashboard} />;
-  }
-
   return (
     <div className="min-h-screen flex flex-col">
       <Header title="ForeScore" />
@@ -235,7 +251,7 @@ function HomePage({ config, setConfig }: HomePageProps) {
             <div className="mb-6">
               <form onSubmit={handleTripIdSubmit} className="mb-4">
                 <label className="block text-sm font-medium text-gray-700">
-                  Enter Trip ID
+                  Enter Trip Id
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -262,9 +278,9 @@ function HomePage({ config, setConfig }: HomePageProps) {
             </div>
           )}
 
-          {config.tripId && !showDashboard && (
+          {config.tripId && (
             <>
-              <p className="mb-4">Trip ID: {config.tripId}</p>
+              <p className="mb-4">Trip Id: {config.tripId}</p>
               {!isLeader && (
                 <form onSubmit={handlePinSubmit} className="mb-6">
                   <label className="block text-sm font-medium text-gray-700">
@@ -336,12 +352,16 @@ function HomePage({ config, setConfig }: HomePageProps) {
                               lineupOrder: player.lineupOrder.slice(0, newNumRounds).concat(Array(Math.max(0, newNumRounds - player.lineupOrder.length)).fill(0)),
                             })),
                           }));
+                          const newCourses = prev.courses.slice(0, newNumRounds).concat(
+                            Array(Math.max(0, newNumRounds - prev.courses.length)).fill('True Blue')
+                          );
                           return {
                             ...prev,
                             numRounds: newNumRounds,
                             scoringMethods: prev.scoringMethods.slice(0, newNumRounds).concat(
                               Array(Math.max(0, newNumRounds - prev.scoringMethods.length)).fill('match')
                             ),
+                            courses: newCourses,
                             teams: newTeams,
                           };
                         });
@@ -363,6 +383,25 @@ function HomePage({ config, setConfig }: HomePageProps) {
                       >
                         <option value="match">Match Play</option>
                         <option value="stroke">Stroke Play</option>
+                      </select>
+                    </div>
+                  ))}
+                  {Array.from({ length: config.numRounds }, (_, index) => (
+                    <div key={`course-${index}`}>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Course for Round {index + 1}
+                      </label>
+                      <select
+                        name="course"
+                        value={config.courses[index]}
+                        onChange={(e) => handleConfigChange(e, index)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      >
+                        {golfCourses.map((course) => (
+                          <option key={course.name} value={course.name}>
+                            {course.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   ))}
@@ -388,7 +427,7 @@ function HomePage({ config, setConfig }: HomePageProps) {
               <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
                 <h3 className="text-lg font-semibold mb-4">Set Up New Trip</h3>
                 <form onSubmit={handleSetupSubmit} className="grid gap-4">
-                  <p className="text-sm text-gray-600">Trip ID: {tempConfig.tripId}</p>
+                  <p className="text-sm text-gray-600">Trip Id: {tempConfig.tripId}</p>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
                       Number of Teams
@@ -441,6 +480,25 @@ function HomePage({ config, setConfig }: HomePageProps) {
                       >
                         <option value="match">Match Play</option>
                         <option value="stroke">Stroke Play</option>
+                      </select>
+                    </div>
+                  ))}
+                  {Array.from({ length: tempConfig.numRounds }, (_, index) => (
+                    <div key={`course-${index}`}>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Course for Round {index + 1}
+                      </label>
+                      <select
+                        name="course"
+                        value={tempConfig.courses[index]}
+                        onChange={(e) => handleSetupConfigChange(e, index)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      >
+                        {golfCourses.map((course) => (
+                          <option key={course.name} value={course.name}>
+                            {course.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   ))}

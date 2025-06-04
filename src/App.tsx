@@ -10,6 +10,7 @@ export interface EventConfig {
   playersPerTeam: number;
   numRounds: number;
   scoringMethods: ('match' | 'stroke')[];
+  courses: string[]; // Added to store selected courses for each round
   teams: {
     name: string;
     players: {
@@ -27,6 +28,7 @@ const App: React.FC = () => {
     playersPerTeam: 4,
     numRounds: 3,
     scoringMethods: ['match', 'match', 'match'],
+    courses: ['True Blue', 'True Blue', 'True Blue'], // Default courses
     teams: [],
   });
 
@@ -34,7 +36,7 @@ const App: React.FC = () => {
     <Router>
       <Routes>
         <Route path="/" element={<HomePage config={config} setConfig={setConfig} />} />
-        <Route path="/dashboard" element={<Dashboard config={config} setConfig={setConfig} setShowDashboard={() => {}} />} />
+        <Route path="/dashboard" element={<Dashboard config={config} setConfig={setConfig} />} />
         <Route path="/round-scoreboard" element={<RoundScoreboard config={config} />} />
       </Routes>
     </Router>
