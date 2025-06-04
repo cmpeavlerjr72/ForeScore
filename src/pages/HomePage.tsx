@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { EventConfig } from '../App';
 import { saveConfig, loadConfig, generateTripId } from '../utils/storage';
 import Dashboard from './Dashboard';
-import logo from '../assets/ForeScore.png'; // Adjust the path and file name as needed
+import Header from '../components/Header';
+import Footer from '../components/Footer';
 
 interface HomePageProps {
   config: EventConfig;
@@ -25,7 +26,7 @@ function HomePage({ config, setConfig }: HomePageProps) {
       players: Array.from({ length: playersPerTeam }, (_, playerIndex) => ({
         name: `Player ${playerIndex + 1}`,
         scores: Array(numRounds).fill(0),
-        lineupOrder: Array(numRounds).fill(playerIndex), // Default to original index
+        lineupOrder: Array(numRounds).fill(playerIndex),
       })),
     }));
     return {
@@ -39,7 +40,6 @@ function HomePage({ config, setConfig }: HomePageProps) {
   });
   const [showDashboard, setShowDashboard] = useState(false);
 
-  // Load config when trip ID is entered
   useEffect(() => {
     if (tripIdInput) {
       const savedConfig = loadConfig(tripIdInput);
@@ -59,14 +59,14 @@ function HomePage({ config, setConfig }: HomePageProps) {
       setConfig((prev) => ({
         ...prev,
         tripId: tripIdInput,
-        teams: prev.teams, // Preserve teams
+        teams: prev.teams,
       }));
     }
   };
 
   const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === '1234') { // Hardcoded PIN for now
+    if (pin === '1234') {
       setIsLeader(true);
       setError('');
     } else {
@@ -144,7 +144,7 @@ function HomePage({ config, setConfig }: HomePageProps) {
     setConfig(tempConfig);
     saveConfig(tempConfig);
     setShowSetupModal(false);
-    setIsLeader(true); // Creator is assumed to be the leader
+    setIsLeader(true);
     setShowDashboard(true);
     setError('');
   };
@@ -225,294 +225,296 @@ function HomePage({ config, setConfig }: HomePageProps) {
   }
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <div className="flex justify-center mb-6">
-        <img src={logo} alt="ForeScore Logo" className="h-16" />
-      </div>
-      <h2 className="text-xl font-semibold mb-4 text-center">ForeScore</h2>
-      {error && <p className="text-red-500 mb-4">{error}</p>}
+    <div className="min-h-screen flex flex-col">
+      <Header title="ForeScore" />
+      <main className="flex-grow container mx-auto p-4">
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          {error && <p className="text-red-500 mb-4">{error}</p>}
 
-      {!config.tripId && (
-        <div className="mb-6">
-          <form onSubmit={handleTripIdSubmit} className="mb-4">
-            <label className="block text-sm font-medium text-gray-700">
-              Enter Trip ID
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={tripIdInput}
-                onChange={(e) => setTripIdInput(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                placeholder="e.g., TRIP2025"
-              />
-              <button
-                type="submit"
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                Load Trip
-              </button>
-            </div>
-          </form>
-          <button
-            onClick={handleCreateNewTrip}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-          >
-            Create New Trip
-          </button>
-        </div>
-      )}
-
-      {config.tripId && !showDashboard && (
-        <>
-          <p className="mb-4">Trip ID: {config.tripId}</p>
-          {!isLeader && (
-            <form onSubmit={handlePinSubmit} className="mb-6">
-              <label className="block text-sm font-medium text-gray-700">
-                Enter Leader PIN (for editing)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="Enter PIN"
-                />
-                <button
-                  type="submit"
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                >
-                  Verify PIN
-                </button>
-              </div>
-            </form>
-          )}
-
-          {isLeader && (
-            <div className="grid gap-4">
-              <h3 className="text-lg font-semibold">Configure Event</h3>
-              <div>
+          {!config.tripId && (
+            <div className="mb-6">
+              <form onSubmit={handleTripIdSubmit} className="mb-4">
                 <label className="block text-sm font-medium text-gray-700">
-                  Number of Teams
+                  Enter Trip ID
                 </label>
-                <input
-                  type="number"
-                  name="numTeams"
-                  value={config.numTeams}
-                  onChange={handleConfigChange}
-                  min="2"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Players per Team
-                </label>
-                <input
-                  type="number"
-                  name="playersPerTeam"
-                  value={config.playersPerTeam}
-                  onChange={handleConfigChange}
-                  min="1"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Number of Rounds
-                </label>
-                <input
-                  type="number"
-                  name="numRounds"
-                  value={config.numRounds}
-                  onChange={(e) => {
-                    const newNumRounds = parseInt(e.target.value) || (config.numRounds as number);
-                    setConfig((prev) => {
-                      const newTeams = prev.teams.map((team) => ({
-                        ...team,
-                        players: team.players.map((player) => ({
-                          ...player,
-                          scores: player.scores.slice(0, newNumRounds).concat(Array(Math.max(0, newNumRounds - player.scores.length)).fill(0)),
-                          lineupOrder: player.lineupOrder.slice(0, newNumRounds).concat(Array(Math.max(0, newNumRounds - player.lineupOrder.length)).fill(0)),
-                        })),
-                      }));
-                      return {
-                        ...prev,
-                        numRounds: newNumRounds,
-                        scoringMethods: prev.scoringMethods.slice(0, newNumRounds).concat(
-                          Array(Math.max(0, newNumRounds - prev.scoringMethods.length)).fill('match')
-                        ),
-                        teams: newTeams,
-                      };
-                    });
-                  }}
-                  min="1"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              {Array.from({ length: config.numRounds }, (_, index) => (
-                <div key={index}>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Scoring Method for Round {index + 1}
-                  </label>
-                  <select
-                    name="scoringMethod"
-                    value={config.scoringMethods[index]}
-                    onChange={(e) => handleConfigChange(e, index)}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={tripIdInput}
+                    onChange={(e) => setTripIdInput(e.target.value)}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="e.g., TRIP2025"
+                  />
+                  <button
+                    type="submit"
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
                   >
-                    <option value="match">Match Play</option>
-                    <option value="stroke">Stroke Play</option>
-                  </select>
+                    Load Trip
+                  </button>
                 </div>
-              ))}
+              </form>
               <button
-                onClick={handleSaveConfig}
+                onClick={handleCreateNewTrip}
                 className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
               >
-                Save Configuration
-              </button>
-              <button
-                onClick={() => setShowLineupModal(true)}
-                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
-              >
-                Set Lineups
+                Create New Trip
               </button>
             </div>
           )}
-        </>
-      )}
 
-      {showSetupModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4">Set Up New Trip</h3>
-            <form onSubmit={handleSetupSubmit} className="grid gap-4">
-              <p className="text-sm text-gray-600">Trip ID: {tempConfig.tripId}</p>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Number of Teams
-                </label>
-                <input
-                  type="number"
-                  name="numTeams"
-                  value={tempConfig.numTeams}
-                  onChange={handleSetupConfigChange}
-                  min="2"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Players per Team
-                </label>
-                <input
-                  type="number"
-                  name="playersPerTeam"
-                  value={tempConfig.playersPerTeam}
-                  onChange={handleSetupConfigChange}
-                  min="1"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Number of Rounds
-                </label>
-                <input
-                  type="number"
-                  name="numRounds"
-                  value={tempConfig.numRounds}
-                  onChange={handleSetupNumRoundsChange}
-                  min="1"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              {Array.from({ length: tempConfig.numRounds }, (_, index) => (
-                <div key={index}>
+          {config.tripId && !showDashboard && (
+            <>
+              <p className="mb-4">Trip ID: {config.tripId}</p>
+              {!isLeader && (
+                <form onSubmit={handlePinSubmit} className="mb-6">
                   <label className="block text-sm font-medium text-gray-700">
-                    Scoring Method for Round {index + 1}
+                    Enter Leader PIN (for editing)
                   </label>
-                  <select
-                    name="scoringMethod"
-                    value={tempConfig.scoringMethods[index]}
-                    onChange={(e) => handleSetupConfigChange(e, index)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  >
-                    <option value="match">Match Play</option>
-                    <option value="stroke">Stroke Play</option>
-                  </select>
-                </div>
-              ))}
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                >
-                  Save Setup
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowSetupModal(false)}
-                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      placeholder="Enter PIN"
+                    />
+                    <button
+                      type="submit"
+                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                    >
+                      Verify PIN
+                    </button>
+                  </div>
+                </form>
+              )}
 
-      {showLineupModal && isLeader && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-2xl w-full">
-            <h3 className="text-lg font-semibold mb-4">Set Lineups</h3>
-            <form onSubmit={handleLineupSubmit} className="grid gap-4">
-              {config.teams.map((team, teamIndex) => (
-                <div key={teamIndex}>
-                  <h4 className="text-md font-medium mb-2">{team.name}</h4>
-                  {Array.from({ length: config.numRounds }, (_, roundIndex) => (
-                    <div key={roundIndex} className="mb-4">
-                      <h5 className="text-sm font-medium mb-2">Round {roundIndex + 1}</h5>
-                      {team.players.map((player, playerIndex) => (
-                        <div key={playerIndex} className="flex items-center gap-2 mb-2">
-                          <span>{player.name}</span>
-                          <select
-                            value={player.lineupOrder[roundIndex]}
-                            onChange={(e) => handleLineupChange(teamIndex, roundIndex, playerIndex, parseInt(e.target.value))}
-                            className="mt-1 block w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                          >
-                            {Array.from({ length: config.playersPerTeam }, (_, i) => (
-                              <option key={i} value={i}>{i + 1}</option>
-                            ))}
-                          </select>
+              {isLeader && (
+                <div className="grid gap-4">
+                  <h3 className="text-lg font-semibold">Configure Event</h3>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Number of Teams
+                    </label>
+                    <input
+                      type="number"
+                      name="numTeams"
+                      value={config.numTeams}
+                      onChange={handleConfigChange}
+                      min="2"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Players per Team
+                    </label>
+                    <input
+                      type="number"
+                      name="playersPerTeam"
+                      value={config.playersPerTeam}
+                      onChange={handleConfigChange}
+                      min="1"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Number of Rounds
+                    </label>
+                    <input
+                      type="number"
+                      name="numRounds"
+                      value={config.numRounds}
+                      onChange={(e) => {
+                        const newNumRounds = parseInt(e.target.value) || (config.numRounds as number);
+                        setConfig((prev) => {
+                          const newTeams = prev.teams.map((team) => ({
+                            ...team,
+                            players: team.players.map((player) => ({
+                              ...player,
+                              scores: player.scores.slice(0, newNumRounds).concat(Array(Math.max(0, newNumRounds - player.scores.length)).fill(0)),
+                              lineupOrder: player.lineupOrder.slice(0, newNumRounds).concat(Array(Math.max(0, newNumRounds - player.lineupOrder.length)).fill(0)),
+                            })),
+                          }));
+                          return {
+                            ...prev,
+                            numRounds: newNumRounds,
+                            scoringMethods: prev.scoringMethods.slice(0, newNumRounds).concat(
+                              Array(Math.max(0, newNumRounds - prev.scoringMethods.length)).fill('match')
+                            ),
+                            teams: newTeams,
+                          };
+                        });
+                      }}
+                      min="1"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  {Array.from({ length: config.numRounds }, (_, index) => (
+                    <div key={index}>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Scoring Method for Round {index + 1}
+                      </label>
+                      <select
+                        name="scoringMethod"
+                        value={config.scoringMethods[index]}
+                        onChange={(e) => handleConfigChange(e, index)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      >
+                        <option value="match">Match Play</option>
+                        <option value="stroke">Stroke Play</option>
+                      </select>
+                    </div>
+                  ))}
+                  <button
+                    onClick={handleSaveConfig}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                  >
+                    Save Configuration
+                  </button>
+                  <button
+                    onClick={() => setShowLineupModal(true)}
+                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                  >
+                    Set Lineups
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {showSetupModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+              <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+                <h3 className="text-lg font-semibold mb-4">Set Up New Trip</h3>
+                <form onSubmit={handleSetupSubmit} className="grid gap-4">
+                  <p className="text-sm text-gray-600">Trip ID: {tempConfig.tripId}</p>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Number of Teams
+                    </label>
+                    <input
+                      type="number"
+                      name="numTeams"
+                      value={tempConfig.numTeams}
+                      onChange={handleSetupConfigChange}
+                      min="2"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Players per Team
+                    </label>
+                    <input
+                      type="number"
+                      name="playersPerTeam"
+                      value={tempConfig.playersPerTeam}
+                      onChange={handleSetupConfigChange}
+                      min="1"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Number of Rounds
+                    </label>
+                    <input
+                      type="number"
+                      name="numRounds"
+                      value={tempConfig.numRounds}
+                      onChange={handleSetupNumRoundsChange}
+                      min="1"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  {Array.from({ length: tempConfig.numRounds }, (_, index) => (
+                    <div key={index}>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Scoring Method for Round {index + 1}
+                      </label>
+                      <select
+                        name="scoringMethod"
+                        value={tempConfig.scoringMethods[index]}
+                        onChange={(e) => handleSetupConfigChange(e, index)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      >
+                        <option value="match">Match Play</option>
+                        <option value="stroke">Stroke Play</option>
+                      </select>
+                    </div>
+                  ))}
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                    >
+                      Save Setup
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowSetupModal(false)}
+                      className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {showLineupModal && isLeader && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+              <div className="bg-white p-6 rounded-lg shadow-lg max-w-2xl w-full">
+                <h3 className="text-lg font-semibold mb-4">Set Lineups</h3>
+                <form onSubmit={handleLineupSubmit} className="grid gap-4">
+                  {config.teams.map((team, teamIndex) => (
+                    <div key={teamIndex}>
+                      <h4 className="text-md font-medium mb-2">{team.name}</h4>
+                      {Array.from({ length: config.numRounds }, (_, roundIndex) => (
+                        <div key={roundIndex} className="mb-4">
+                          <h5 className="text-sm font-medium mb-2">Round {roundIndex + 1}</h5>
+                          {team.players.map((player, playerIndex) => (
+                            <div key={playerIndex} className="flex items-center gap-2 mb-2">
+                              <span>{player.name}</span>
+                              <select
+                                value={player.lineupOrder[roundIndex]}
+                                onChange={(e) => handleLineupChange(teamIndex, roundIndex, playerIndex, parseInt(e.target.value))}
+                                className="mt-1 block w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              >
+                                {Array.from({ length: config.playersPerTeam }, (_, i) => (
+                                  <option key={i} value={i}>{i + 1}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ))}
                         </div>
                       ))}
                     </div>
                   ))}
-                </div>
-              ))}
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                >
-                  Save Lineups
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowLineupModal(false)}
-                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                    >
+                      Save Lineups
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowLineupModal(false)}
+                      className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               </div>
-            </form>
-          </div>
+            </div>
+          )}
         </div>
-      )}
+      </main>
+      <Footer />
     </div>
   );
 }

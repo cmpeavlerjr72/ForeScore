@@ -4,9 +4,9 @@ import { Chart as ChartJS, ChartOptions, Plugin } from 'chart.js';
 import { CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { EventConfig } from '../App';
-import logo from '../assets/ForeScore.png'; // Adjust the path and file name as needed
+import Header from '../components/Header';
+import Footer from '../components/Footer';
 
-// Register Chart.js components and the datalabels plugin
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -135,86 +135,85 @@ const Dashboard: React.FC<DashboardProps> = ({ config, setConfig, setShowDashboa
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <header className="bg-blue-700 text-white p-4 mb-6 rounded-t-lg flex items-center justify-center gap-4">
-        <img src={logo} alt="ForeScore Logo" className="h-12" />
-        <h1 className="text-2xl font-bold">ForeScore - Final Scores</h1>
-      </header>
+    <div className="min-h-screen flex flex-col">
+      <Header title="ForeScore - Final Scores" />
+      <main className="flex-grow container mx-auto p-4">
+        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+          <Bar data={chartData} options={chartOptions} />
+        </div>
 
-      <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-        <Bar data={chartData} options={chartOptions} />
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        {config.teams.map((team, teamIndex) => (
-          <div key={teamIndex} className="mb-6">
-            <h2 className="text-xl font-semibold mb-4">{team.name}</h2>
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="border p-2">Player</th>
-                  {Array.from({ length: config.numRounds }, (_, roundIndex) => (
-                    <th key={roundIndex} className="border p-2">
-                      Round {roundIndex + 1}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {team.players.map((player, playerIndex) => (
-                  <tr key={playerIndex}>
-                    <td className="border p-2">{player.name}</td>
-                    {player.scores.map((score, roundIndex) => (
-                      <td key={roundIndex} className="border p-2">
-                        {isEditing ? (
-                          <input
-                            type="number"
-                            value={editScores[teamIndex][playerIndex][roundIndex]}
-                            onChange={(e) =>
-                              handleScoreChange(
-                                teamIndex,
-                                playerIndex,
-                                roundIndex,
-                                e.target.value
-                              )
-                            }
-                            className="w-16 border rounded p-1"
-                          />
-                        ) : (
-                          score
-                        )}
-                      </td>
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          {config.teams.map((team, teamIndex) => (
+            <div key={teamIndex} className="mb-6">
+              <h2 className="text-xl font-semibold mb-4">{team.name}</h2>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="border p-2">Player</th>
+                    {Array.from({ length: config.numRounds }, (_, roundIndex) => (
+                      <th key={roundIndex} className="border p-2">
+                        Round {roundIndex + 1}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {team.players.map((player, playerIndex) => (
+                    <tr key={playerIndex}>
+                      <td className="border p-2">{player.name}</td>
+                      {player.scores.map((score, roundIndex) => (
+                        <td key={roundIndex} className="border p-2">
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              value={editScores[teamIndex][playerIndex][roundIndex]}
+                              onChange={(e) =>
+                                handleScoreChange(
+                                  teamIndex,
+                                  playerIndex,
+                                  roundIndex,
+                                  e.target.value
+                                )
+                              }
+                              className="w-16 border rounded p-1"
+                            />
+                          ) : (
+                            score
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+          <div className="flex gap-4 mt-6">
+            <button
+              onClick={handleBackToConfig}
+              className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+            >
+              Back to Configuration
+            </button>
+            {isEditing ? (
+              <button
+                onClick={handleSaveScores}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              >
+                Save Scores
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              >
+                Edit Scores
+              </button>
+            )}
           </div>
-        ))}
-        <div className="flex gap-4 mt-6">
-          <button
-            onClick={handleBackToConfig}
-            className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-          >
-            Back to Configuration
-          </button>
-          {isEditing ? (
-            <button
-              onClick={handleSaveScores}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-            >
-              Save Scores
-            </button>
-          ) : (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-            >
-              Edit Scores
-            </button>
-          )}
         </div>
-      </div>
+      </main>
+      <Footer />
     </div>
   );
 };

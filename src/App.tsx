@@ -1,17 +1,8 @@
 import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';
-
-// Define interfaces for the event configuration
-export interface Player {
-  name: string;
-  scores: number[];
-  lineupOrder: number[];
-}
-
-export interface Team {
-  name: string;
-  players: Player[];
-}
+import Dashboard from './pages/Dashboard';
+import RoundScoreboard from './pages/RoundScoreboard';
 
 export interface EventConfig {
   tripId: string;
@@ -19,31 +10,35 @@ export interface EventConfig {
   playersPerTeam: number;
   numRounds: number;
   scoringMethods: ('match' | 'stroke')[];
-  teams: Team[];
+  teams: {
+    name: string;
+    players: {
+      name: string;
+      scores: number[];
+      lineupOrder: number[];
+    }[];
+  }[];
 }
 
-function App() {
+const App: React.FC = () => {
   const [config, setConfig] = useState<EventConfig>({
     tripId: '',
     numTeams: 2,
     playersPerTeam: 4,
     numRounds: 3,
     scoringMethods: ['match', 'match', 'match'],
-    teams: Array.from({ length: 2 }, (_, teamIndex) => ({
-      name: `Team ${teamIndex + 1}`,
-      players: Array.from({ length: 4 }, (_, playerIndex) => ({
-        name: `Player ${playerIndex + 1}`,
-        scores: Array(3).fill(0),
-        lineupOrder: Array(3).fill(playerIndex), // Default lineup order
-      })),
-    })),
+    teams: [],
   });
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <HomePage config={config} setConfig={setConfig} />
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<HomePage config={config} setConfig={setConfig} />} />
+        <Route path="/dashboard" element={<Dashboard config={config} setConfig={setConfig} setShowDashboard={() => {}} />} />
+        <Route path="/round-scoreboard" element={<RoundScoreboard config={config} />} />
+      </Routes>
+    </Router>
   );
-}
+};
 
 export default App;
