@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { EventConfig } from '../App';
 import { saveConfig, loadConfig, generateTripId } from '../utils/storage';
 import Dashboard from './Dashboard';
+import logo from '../assets/ForeScore.png'; // Adjust the path and file name as needed
 
 interface HomePageProps {
   config: EventConfig;
@@ -225,7 +226,10 @@ function HomePage({ config, setConfig }: HomePageProps) {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-xl font-semibold mb-4">Bros Ryder Cup</h2>
+      <div className="flex justify-center mb-6">
+        <img src={logo} alt="ForeScore Logo" className="h-16" />
+      </div>
+      <h2 className="text-xl font-semibold mb-4 text-center">ForeScore</h2>
       {error && <p className="text-red-500 mb-4">{error}</p>}
 
       {!config.tripId && (
