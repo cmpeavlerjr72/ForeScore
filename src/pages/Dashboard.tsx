@@ -4,9 +4,18 @@ import { Chart as ChartJS, ChartOptions, Plugin } from 'chart.js';
 import { CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { EventConfig } from '../App';
+import logo from '../assets/ForeScore.png'; // Adjust the path and file name as needed
 
-// Register Chart.js components
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartDataLabels);
+// Register Chart.js components and the datalabels plugin
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ChartDataLabels
+);
 
 interface DashboardProps {
   config: EventConfig;
@@ -14,211 +23,196 @@ interface DashboardProps {
   setShowDashboard: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-interface Matchup {
-  players: { player: string; teamName: string; teamColor: string }[];
-  result: string;
-}
-
 const Dashboard: React.FC<DashboardProps> = ({ config, setConfig, setShowDashboard }) => {
-  const [activeRound, setActiveRound] = useState<number>(0); // Track the active round tab
-
-  // Define a list of distinct colors for teams
-  const teamColors = [
-    { background: '#ef4444', border: '#dc2626' }, // Red
-    { background: '#3b82f6', border: '#1e40af' }, // Blue
-    { background: '#10b981', border: '#059669' }, // Green
-    { background: '#8b5cf6', border: '#7c3aed' }, // Purple
-    { background: '#f97316', border: '#ea580c' }, // Orange
-  ];
-
-  // Assign colors to teams without repetition
-  const teamColorAssignments = config.teams.map((_, index) => {
-    const colorIndex = index % teamColors.length;
-    return teamColors[colorIndex];
-  });
-
-  // Calculate total points per team (sum of player scores across all rounds)
-  const points = config.teams.map((team) =>
-    team.players.reduce(
-      (teamTotal, player) =>
-        teamTotal + player.scores.reduce((roundTotal, score) => roundTotal + score, 0),
-      0
+  const [isEditing, setIsEditing] = useState(false);
+  const [editScores, setEditScores] = useState(
+    config.teams.map((team) =>
+      team.players.map((player) => player.scores.map((score) => score.toString()))
     )
   );
 
-  const totalPoints = config.numRounds * (config.playersPerTeam * 2); // Max points per round per player pair
-  const winThreshold = Math.ceil(totalPoints / 2); // Points needed to win
+  const calculateTotalScores = () => {
+    return config.teams.map((team, teamIndex) => {
+      let totalTeamScore = 0;
+      team.players.forEach((player, playerIndex) => {
+        player.scores.forEach((score, roundIndex) => {
+          const opponentTeamIndex = teamIndex === 0 ? 1 : 0;
+          const opponentPlayerIndex = config.teams[opponentTeamIndex].players.findIndex(
+            (oppPlayer) =>
+              oppPlayer.lineupOrder[roundIndex] === player.lineupOrder[roundIndex]
+          );
+          const opponentScore =
+            config.teams[opponentTeamIndex].players[opponentPlayerIndex]?.scores[roundIndex] || 0;
+          const scoringMethod = config.scoringMethods[roundIndex];
 
-  // Chart data
+          if (scoringMethod === 'match') {
+            if (score > opponentScore) totalTeamScore += 1;
+            else if (score === opponentScore) totalTeamScore += 0.5;
+          } else if (scoringMethod === 'stroke') {
+            totalTeamScore += score;
+          }
+        });
+      });
+      return totalTeamScore;
+    });
+  };
+
+  const totalScores = calculateTotalScores();
+
   const chartData = {
     labels: config.teams.map((team) => team.name),
     datasets: [
       {
-        data: points,
-        backgroundColor: teamColorAssignments.map((color) => color.background),
-        borderColor: teamColorAssignments.map((color) => color.border),
+        label: 'Total Score',
+        data: totalScores,
+        backgroundColor: ['#60A5FA', '#F87171'],
+        borderColor: ['#2563EB', '#DC2626'],
         borderWidth: 1,
       },
     ],
   };
 
-  // Custom plugin for win threshold line
-  const winThresholdPlugin: Plugin<'bar'> = {
-    id: 'winThreshold',
-    afterDraw: (chart) => {
-      const ctx = chart.ctx;
-      const xAxis = chart.scales.x;
-      const thresholdX = xAxis.getPixelForValue(winThreshold);
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.setLineDash([5, 5]); // Dotted line
-      ctx.moveTo(thresholdX, chart.chartArea.top);
-      ctx.lineTo(thresholdX, chart.chartArea.bottom);
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#f59e0b'; // Yellow from Ryder Cup
-      ctx.stroke();
-      ctx.restore();
-
-      // Add threshold label
-      ctx.fillStyle = '#f59e0b';
-      ctx.font = 'bold 12px Arial';
-      ctx.fillText(`Win: ${winThreshold}`, thresholdX + 5, chart.chartArea.bottom - 5);
-    },
-  };
-
-  // Typed chart options
   const chartOptions: ChartOptions<'bar'> = {
-    indexAxis: 'y' as const, // Horizontal bars
-    plugins: {
-      legend: { display: false },
-      datalabels: { anchor: 'end' as const, align: 'right' as const, color: '#fff', font: { weight: 'bold' } },
-    },
+    indexAxis: 'y',
     scales: {
-      x: { beginAtZero: true, max: totalPoints, title: { display: true, text: 'Points' } },
-      y: { title: { display: true, text: 'Teams' } },
+      x: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Points',
+        },
+      },
+      y: {
+        title: {
+          display: true,
+          text: 'Teams',
+        },
+      },
     },
-    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false,
+      },
+      title: {
+        display: true,
+        text: 'Total Scores by Team',
+      },
+      datalabels: {
+        anchor: 'end',
+        align: 'end',
+        formatter: (value: number) => value.toString(),
+      },
+    },
   };
 
-  // Generate matchups for the active round using lineup order
-  const matchups: Matchup[] = [];
-  const maxPlayers = Math.max(...config.teams.map((team) => team.players.length));
-  for (let i = 0; i < maxPlayers; i++) {
-    const matchupPlayers: { player: string; teamName: string; teamColor: string }[] = [];
-    config.teams.forEach((team, teamIndex) => {
-      const playerIndex = team.players.findIndex(p => p.lineupOrder[activeRound] === i);
-      const player = playerIndex !== -1 ? team.players[playerIndex] : null;
-      matchupPlayers.push({
-        player: player ? player.name : 'N/A',
-        teamName: team.name,
-        teamColor: teamColorAssignments[teamIndex].background,
-      });
-    });
-    matchups.push({ players: matchupPlayers, result: 'TIED' });
-  }
+  const handleScoreChange = (
+    teamIndex: number,
+    playerIndex: number,
+    roundIndex: number,
+    value: string
+  ) => {
+    const newEditScores = [...editScores];
+    newEditScores[teamIndex][playerIndex][roundIndex] = value;
+    setEditScores(newEditScores);
+  };
+
+  const handleSaveScores = () => {
+    const newTeams = config.teams.map((team, teamIndex) => ({
+      ...team,
+      players: team.players.map((player, playerIndex) => ({
+        ...player,
+        scores: editScores[teamIndex][playerIndex].map((score) =>
+          parseInt(score) || 0
+        ),
+      })),
+    }));
+    setConfig((prev) => ({ ...prev, teams: newTeams }));
+    setIsEditing(false);
+  };
+
+  const handleBackToConfig = () => {
+    setShowDashboard(false);
+  };
 
   return (
-    <div className="bg-gray-100 min-h-screen p-6">
-      <header className="bg-blue-700 text-white p-4 mb-6 rounded-t-lg">
-        <h1 className="text-2xl font-bold">Bros Ryder Cup - Final Scores</h1>
+    <div className="container mx-auto p-4">
+      <header className="bg-blue-700 text-white p-4 mb-6 rounded-t-lg flex items-center justify-center gap-4">
+        <img src={logo} alt="ForeScore Logo" className="h-12" />
+        <h1 className="text-2xl font-bold">ForeScore - Final Scores</h1>
       </header>
-      <div className="bg-white p-6 rounded-b-lg shadow-md">
-        <div className="flex justify-between items-center mb-4">
-          <button
-            onClick={() => setShowDashboard(false)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-          >
-            Back to Home
-          </button>
-          <button
-            onClick={() => setShowDashboard(false)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-          >
-            Edit Configuration
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-6">
-          {config.teams.map((team, index) => (
-            <div
-              key={index}
-              className="p-4 rounded text-white"
-              style={{ backgroundColor: teamColorAssignments[index].background }}
-            >
-              <h2 className="text-xl font-semibold">{team.name}</h2>
-              <p className="text-3xl">{points[index] === 0 ? '0' : `${points[index]}½`}</p>
-            </div>
-          ))}
-        </div>
-        <div className="mt-6 h-64">
-          <Bar data={chartData} options={chartOptions} plugins={[winThresholdPlugin]} />
-        </div>
-        <div className="border-t-4 border-yellow-400 my-4"></div>
-        <p className="text-center text-gray-600 mb-6">Total Points: {totalPoints}</p>
 
-        {/* Round Tabs */}
-        <div className="mb-6">
-          <div className="flex border-b border-gray-200">
-            {Array.from({ length: config.numRounds }, (_, roundIndex) => (
-              <button
-                key={roundIndex}
-                className={`px-4 py-2 font-medium text-sm ${
-                  activeRound === roundIndex
-                    ? 'border-b-2 border-blue-700 text-blue-700'
-                    : 'text-gray-500 hover:text-blue-700'
-                }`}
-                onClick={() => setActiveRound(roundIndex)}
-              >
-                Round {roundIndex + 1}
-              </button>
-            ))}
-          </div>
-        </div>
+      <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+        <Bar data={chartData} options={chartOptions} />
+      </div>
 
-        {/* Round Scoreboard */}
-        <div>
-          <div className="bg-gray-200 p-2 mb-2 flex justify-between items-center">
-            <h3 className="text-lg font-bold">
-              {config.teams.map((team, index) => `${team.name} ${points[index]} ${index < config.teams.length - 1 ? '-' : ''}`).join(' ')}
-            </h3>
-            <span className="text-sm font-medium">
-              Round {activeRound + 1} - {config.scoringMethods[activeRound]} Play
-            </span>
-          </div>
-          <table className="min-w-full bg-white border">
-            <thead>
-              <tr>
-                {config.teams.map((team, index) => (
-                  <th
-                    key={index}
-                    className="px-4 py-2 text-left text-sm font-medium text-white border-b"
-                    style={{ backgroundColor: teamColorAssignments[index].background }}
-                  >
-                    {team.name}
-                  </th>
-                ))}
-                <th className="px-4 py-2 text-center text-sm font-medium text-gray-700 border-b">
-                  Result
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {matchups.map((matchup, index) => (
-                <tr key={index}>
-                  {matchup.players.map((player, playerIndex) => (
-                    <td
-                      key={playerIndex}
-                      className="px-4 py-2 border-b"
-                      style={{ backgroundColor: player.teamColor }}
-                    >
-                      {player.player}
-                    </td>
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        {config.teams.map((team, teamIndex) => (
+          <div key={teamIndex} className="mb-6">
+            <h2 className="text-xl font-semibold mb-4">{team.name}</h2>
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="border p-2">Player</th>
+                  {Array.from({ length: config.numRounds }, (_, roundIndex) => (
+                    <th key={roundIndex} className="border p-2">
+                      Round {roundIndex + 1}
+                    </th>
                   ))}
-                  <td className="px-4 py-2 border-b text-center">{matchup.result}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {team.players.map((player, playerIndex) => (
+                  <tr key={playerIndex}>
+                    <td className="border p-2">{player.name}</td>
+                    {player.scores.map((score, roundIndex) => (
+                      <td key={roundIndex} className="border p-2">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={editScores[teamIndex][playerIndex][roundIndex]}
+                            onChange={(e) =>
+                              handleScoreChange(
+                                teamIndex,
+                                playerIndex,
+                                roundIndex,
+                                e.target.value
+                              )
+                            }
+                            className="w-16 border rounded p-1"
+                          />
+                        ) : (
+                          score
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+        <div className="flex gap-4 mt-6">
+          <button
+            onClick={handleBackToConfig}
+            className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+          >
+            Back to Configuration
+          </button>
+          {isEditing ? (
+            <button
+              onClick={handleSaveScores}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+            >
+              Save Scores
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+            >
+              Edit Scores
+            </button>
+          )}
         </div>
       </div>
     </div>
