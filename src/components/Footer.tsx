@@ -1,35 +1,18 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import logo from '../assets/ForeScore.png';
 
-interface HeaderProps {
-  title: string;
-}
-
-const Header: React.FC<HeaderProps> = ({ title }) => {
+const Footer: React.FC = () => {
   return (
-    <header className="bg-blue-700 text-white p-4 shadow-md">
-      <div className="container mx-auto flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <img src={logo} alt="ForeScore Logo" className="h-12" />
-          <h1 className="text-2xl font-bold">{title}</h1>
-        </div>
-        <nav>
-          <ul className="flex gap-4">
-            <li>
-              <Link to="/" className="hover:underline">Home</Link>
-            </li>
-            <li>
-              <Link to="/dashboard" className="hover:underline">Dashboard</Link>
-            </li>
-            <li>
-              <Link to="/round-scoreboard" className="hover:underline">Round Scoreboard</Link>
-            </li>
-          </ul>
-        </nav>
+    <footer className="bg-[#0f172a] text-white text-center py-6 mt-12">
+      <div className="container mx-auto px-4">
+        <p className="text-sm">
+          &copy; {new Date().getFullYear()} ForeScore. All rights reserved.
+        </p>
+        <p className="text-xs mt-1 text-gray-400">
+          Built for unforgettable golf trips.
+        </p>
       </div>
-    </header>
+    </footer>
   );
 };
 
-export default Header;
+export default Footer;

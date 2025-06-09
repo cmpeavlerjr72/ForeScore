@@ -1,32 +1,36 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import logo from '../assets/ForeScore.png';
+import whiteLogo from '../assets/ForeScore_white.png';
 
 interface HeaderProps {
-  title: string;
+  showNav?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ title }) => {
+const Header: React.FC<HeaderProps> = ({ showNav = true }) => {
   return (
-    <header className="bg-blue-700 text-white p-4 shadow-md">
+    <header className="bg-[#0f172a] text-white py-3 px-6 shadow-md">
       <div className="container mx-auto flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <img src={logo} alt="ForeScore Logo" className="h-12" />
-          <h1 className="text-2xl font-bold">{title}</h1>
+        {/* Logo only */}
+        <div className="flex items-center">
+          <img src={whiteLogo} alt="ForeScore Logo" className="h-12 md:h-16" />
         </div>
-        <nav>
-          <ul className="flex gap-4">
-            <li>
-              <Link to="/" className="hover:underline">Home</Link>
-            </li>
-            <li>
-              <Link to="/dashboard" className="hover:underline">Dashboard</Link>
-            </li>
-            <li>
-              <Link to="/round-scoreboard" className="hover:underline">Round Scoreboard</Link>
-            </li>
-          </ul>
-        </nav>
+
+        {/* Optional navigation */}
+        {showNav && (
+          <nav>
+            <ul className="flex gap-6 text-sm md:text-base">
+              <li>
+                <Link to="/" className="hover:underline">Home</Link>
+              </li>
+              <li>
+                <Link to="/dashboard" className="hover:underline">Scoreboard</Link>
+              </li>
+              <li>
+                <Link to="/round-scoreboard" className="hover:underline">Rounds</Link>
+              </li>
+            </ul>
+          </nav>
+        )}
       </div>
     </header>
   );

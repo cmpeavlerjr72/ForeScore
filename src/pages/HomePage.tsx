@@ -5,20 +5,21 @@ import { saveConfig, loadConfig, generateTripId } from '../utils/storage';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { GolfCourse, golfCourses } from '../types/GolfCourse';
+import ForeScoreLogo from '../assets/ForeScore.png';
+
 
 interface HomePageProps {
   config: EventConfig;
   setConfig: React.Dispatch<React.SetStateAction<EventConfig>>;
 }
 
-function HomePage({ config, setConfig }: HomePageProps) {
+const HomePage: React.FC<HomePageProps> = ({ config, setConfig }) => {
   const navigate = useNavigate();
   const [tripIdInput, setTripIdInput] = useState('');
   const [pin, setPin] = useState('');
   const [isLeader, setIsLeader] = useState(false);
   const [error, setError] = useState('');
   const [showSetupModal, setShowSetupModal] = useState(false);
-  const [showLineupModal, setShowLineupModal] = useState(false);
   const [tempConfig, setTempConfig] = useState<EventConfig>(() => {
     const numTeams = 2;
     const playersPerTeam = 4;
@@ -37,7 +38,7 @@ function HomePage({ config, setConfig }: HomePageProps) {
       playersPerTeam,
       numRounds,
       scoringMethods: ['match', 'match', 'match'],
-      courses: Array(numRounds).fill('True Blue'), // Default course for each round
+      courses: Array(numRounds).fill('True Blue'),
       teams,
     };
   });
@@ -58,11 +59,7 @@ function HomePage({ config, setConfig }: HomePageProps) {
   const handleTripIdSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (tripIdInput) {
-      setConfig((prev) => ({
-        ...prev,
-        tripId: tripIdInput,
-        teams: prev.teams,
-      }));
+      setConfig((prev) => ({ ...prev, tripId: tripIdInput }));
     }
   };
 
@@ -78,10 +75,7 @@ function HomePage({ config, setConfig }: HomePageProps) {
 
   const handleCreateNewTrip = () => {
     const newTripId = generateTripId();
-    setTempConfig((prev) => ({
-      ...prev,
-      tripId: newTripId,
-    }));
+    setTempConfig((prev) => ({ ...prev, tripId: newTripId }));
     setShowSetupModal(true);
     setError('');
   };
@@ -99,482 +93,244 @@ function HomePage({ config, setConfig }: HomePageProps) {
       }
       if (name === 'course' && index !== undefined) {
         const newCourses = [...prev.courses];
-        newCourses[index] = value as string;
+        newCourses[index] = value;
         return { ...prev, courses: newCourses };
       }
-      const updatedValue = parseInt(value) || (typeof prev[name as keyof EventConfig] === 'number' ? prev[name as keyof EventConfig] as number : 0);
-      let updatedTeams = prev.teams;
+      const updatedValue = parseInt(value);
       if (name === 'numTeams' || name === 'playersPerTeam') {
         const newNumTeams = name === 'numTeams' ? updatedValue : prev.numTeams;
         const newPlayersPerTeam = name === 'playersPerTeam' ? updatedValue : prev.playersPerTeam;
-        updatedTeams = Array.from({ length: newNumTeams as number }, (_, teamIndex) => ({
+        const newTeams = Array.from({ length: newNumTeams }, (_, teamIndex) => ({
           name: `Team ${teamIndex + 1}`,
-          players: Array.from({ length: newPlayersPerTeam as number }, (_, playerIndex) => ({
+          players: Array.from({ length: newPlayersPerTeam }, (_, playerIndex) => ({
             name: `Player ${playerIndex + 1}`,
-            scores: Array(prev.numRounds as number).fill(0),
-            lineupOrder: Array(prev.numRounds as number).fill(playerIndex),
+            scores: Array(prev.numRounds).fill(0),
+            lineupOrder: Array(prev.numRounds).fill(playerIndex),
           })),
         }));
+        return {
+          ...prev,
+          [name]: updatedValue,
+          teams: newTeams,
+        };
       }
-      return {
-        ...prev,
-        [name]: updatedValue,
-        teams: updatedTeams,
-      };
+      return { ...prev, [name]: updatedValue };
     });
   };
 
   const handleSetupNumRoundsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newNumRounds = parseInt(e.target.value) || (tempConfig.numRounds as number);
+    const newNumRounds = parseInt(e.target.value);
     setTempConfig((prev) => {
       const newTeams = prev.teams.map((team) => ({
         ...team,
         players: team.players.map((player) => ({
           ...player,
-          scores: player.scores.slice(0, newNumRounds).concat(Array(Math.max(0, newNumRounds - player.scores.length)).fill(0)),
-          lineupOrder: player.lineupOrder.slice(0, newNumRounds).concat(Array(Math.max(0, newNumRounds - player.lineupOrder.length)).fill(0)),
+          scores: Array(newNumRounds).fill(0),
+          lineupOrder: Array(newNumRounds).fill(0),
         })),
       }));
-      const newCourses = prev.courses.slice(0, newNumRounds).concat(
-        Array(Math.max(0, newNumRounds - prev.courses.length)).fill('True Blue')
-      );
+      const newCourses = Array(newNumRounds).fill('True Blue');
+      const newMethods = Array(newNumRounds).fill('match');
       return {
         ...prev,
         numRounds: newNumRounds,
-        scoringMethods: prev.scoringMethods.slice(0, newNumRounds).concat(
-          Array(Math.max(0, newNumRounds - prev.scoringMethods.length)).fill('match')
-        ),
         courses: newCourses,
+        scoringMethods: newMethods,
         teams: newTeams,
       };
     });
   };
 
-  const handleSetupSubmit = (e: React.FormEvent) => {
+  const handleSetupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setConfig(tempConfig);
     saveConfig(tempConfig);
+  
+    try {
+      const response = await fetch('https://forescore-db.onrender.com/api/trips/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tempConfig),
+      });
+  
+      if (!response.ok) throw new Error('Failed to save trip');
+      console.log('Trip saved to DB');
+    } catch (err) {
+      console.error(err);
+    }
+  
     setShowSetupModal(false);
     setIsLeader(true);
     navigate('/dashboard');
-    setError('');
-  };
-
-  const handleConfigChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-    index?: number
-  ) => {
-    const { name, value } = e.target;
-    setConfig((prev) => {
-      if (name === 'scoringMethod' && index !== undefined) {
-        const newScoringMethods = [...prev.scoringMethods];
-        newScoringMethods[index] = value as 'match' | 'stroke';
-        return {
-          ...prev,
-          scoringMethods: newScoringMethods,
-          teams: prev.teams,
-        };
-      }
-      if (name === 'course' && index !== undefined) {
-        const newCourses = [...prev.courses];
-        newCourses[index] = value as string;
-        return {
-          ...prev,
-          courses: newCourses,
-          teams: prev.teams,
-        };
-      }
-      const updatedValue = name === 'tripId' ? value : parseInt(value) || (typeof prev[name as keyof EventConfig] === 'number' ? prev[name as keyof EventConfig] as number : 0);
-      let updatedTeams = prev.teams;
-      if (name === 'numTeams' || name === 'playersPerTeam') {
-        const newNumTeams = name === 'numTeams' ? updatedValue : prev.numTeams;
-        const newPlayersPerTeam = name === 'playersPerTeam' ? updatedValue : prev.playersPerTeam;
-        updatedTeams = Array.from({ length: newNumTeams as number }, (_, teamIndex) => ({
-          name: `Team ${teamIndex + 1}`,
-          players: Array.from({ length: newPlayersPerTeam as number }, (_, playerIndex) => ({
-            name: `Player ${playerIndex + 1}`,
-            scores: Array(prev.numRounds as number).fill(0),
-            lineupOrder: Array(prev.numRounds as number).fill(playerIndex),
-          })),
-        }));
-      }
-      return {
-        ...prev,
-        [name]: updatedValue,
-        teams: updatedTeams,
-      };
-    });
-  };
-
-  const handleSaveConfig = () => {
-    if (isLeader && config.tripId) {
-      saveConfig(config);
-      alert('Configuration Saved!');
-    } else {
-      setError('Only the trip leader can save configurations with a valid Trip ID');
-    }
-  };
-
-  const handleLineupChange = (teamIndex: number, roundIndex: number, playerIndex: number, newOrder: number) => {
-    setConfig((prev) => {
-      const newTeams = prev.teams.map((team, tIdx) =>
-        tIdx === teamIndex
-          ? {
-              ...team,
-              players: team.players.map((player, pIdx) =>
-                pIdx === playerIndex
-                  ? { ...player, lineupOrder: player.lineupOrder.map((order, rIdx) => rIdx === roundIndex ? newOrder : order) }
-                  : player
-              ),
-            }
-          : team
-      );
-      return { ...prev, teams: newTeams };
-    });
-  };
-
-  const handleLineupSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    saveConfig(config);
-    setShowLineupModal(false);
-    setError('');
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header title="ForeScore" />
-      <main className="flex-grow container mx-auto p-4">
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          {error && <p className="text-red-500 mb-4">{error}</p>}
+    <div className="min-h-screen bg-[#fdfdfb] flex flex-col">
+      {/* Custom Header */}
+      <Header title="ForeScore" showNav={false} />
 
-          {!config.tripId && (
-            <div className="mb-6">
-              <form onSubmit={handleTripIdSubmit} className="mb-4">
-                <label className="block text-sm font-medium text-gray-700">
-                  Enter Trip Id
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={tripIdInput}
-                    onChange={(e) => setTripIdInput(e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    placeholder="e.g., TRIP2025"
-                  />
-                  <button
-                    type="submit"
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                  >
-                    Load Trip
-                  </button>
-                </div>
-              </form>
-              <button
-                onClick={handleCreateNewTrip}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                Create New Trip
+      {/* Hero Section */}
+      <main className="flex-grow container mx-auto flex flex-col items-center justify-center px-4 py-10 text-center">
+        {/* Logo */}
+        <img
+          src={ForeScoreLogo}
+          alt="ForeScore Logo"
+          className="w-64 h-64 md:w-80 md:h-80"
+
+        />
+        <p className="text-lg text-gray-700 mb-6">Your Ultimate Golf Trip Scorekeeper</p>
+              {!config.tripId ? (
+          <div className="space-y-4 w-full max-w-md">
+            <form onSubmit={handleTripIdSubmit} className="flex gap-2">
+              <input
+                type="text"
+                value={tripIdInput}
+                onChange={(e) => setTripIdInput(e.target.value)}
+                className="flex-grow rounded-md border border-gray-300 p-2"
+                placeholder="Enter Trip ID"
+              />
+              <button type="submit" className="bg-[#facc15] text-[#0f172a] px-4 py-2 rounded-lg font-semibold">
+                Load Trip
               </button>
-            </div>
-          )}
-
-          {config.tripId && (
-            <>
-              <p className="mb-4">Trip Id: {config.tripId}</p>
-              {!isLeader && (
-                <form onSubmit={handlePinSubmit} className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Enter Leader PIN (for editing)
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      value={pin}
-                      onChange={(e) => setPin(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      placeholder="Enter PIN"
-                    />
-                    <button
-                      type="submit"
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                    >
-                      Verify PIN
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {isLeader && (
-                <div className="grid gap-4">
-                  <h3 className="text-lg font-semibold">Configure Event</h3>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Number of Teams
-                    </label>
-                    <input
-                      type="number"
-                      name="numTeams"
-                      value={config.numTeams}
-                      onChange={handleConfigChange}
-                      min="2"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Players per Team
-                    </label>
-                    <input
-                      type="number"
-                      name="playersPerTeam"
-                      value={config.playersPerTeam}
-                      onChange={handleConfigChange}
-                      min="1"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Number of Rounds
-                    </label>
-                    <input
-                      type="number"
-                      name="numRounds"
-                      value={config.numRounds}
-                      onChange={(e) => {
-                        const newNumRounds = parseInt(e.target.value) || (config.numRounds as number);
-                        setConfig((prev) => {
-                          const newTeams = prev.teams.map((team) => ({
-                            ...team,
-                            players: team.players.map((player) => ({
-                              ...player,
-                              scores: player.scores.slice(0, newNumRounds).concat(Array(Math.max(0, newNumRounds - player.scores.length)).fill(0)),
-                              lineupOrder: player.lineupOrder.slice(0, newNumRounds).concat(Array(Math.max(0, newNumRounds - player.lineupOrder.length)).fill(0)),
-                            })),
-                          }));
-                          const newCourses = prev.courses.slice(0, newNumRounds).concat(
-                            Array(Math.max(0, newNumRounds - prev.courses.length)).fill('True Blue')
-                          );
-                          return {
-                            ...prev,
-                            numRounds: newNumRounds,
-                            scoringMethods: prev.scoringMethods.slice(0, newNumRounds).concat(
-                              Array(Math.max(0, newNumRounds - prev.scoringMethods.length)).fill('match')
-                            ),
-                            courses: newCourses,
-                            teams: newTeams,
-                          };
-                        });
-                      }}
-                      min="1"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                  {Array.from({ length: config.numRounds }, (_, index) => (
-                    <div key={index}>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Scoring Method for Round {index + 1}
-                      </label>
-                      <select
-                        name="scoringMethod"
-                        value={config.scoringMethods[index]}
-                        onChange={(e) => handleConfigChange(e, index)}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      >
-                        <option value="match">Match Play</option>
-                        <option value="stroke">Stroke Play</option>
-                      </select>
-                    </div>
-                  ))}
-                  {Array.from({ length: config.numRounds }, (_, index) => (
-                    <div key={`course-${index}`}>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Course for Round {index + 1}
-                      </label>
-                      <select
-                        name="course"
-                        value={config.courses[index]}
-                        onChange={(e) => handleConfigChange(e, index)}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      >
-                        {golfCourses.map((course) => (
-                          <option key={course.name} value={course.name}>
-                            {course.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                  <button
-                    onClick={handleSaveConfig}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                  >
-                    Save Configuration
-                  </button>
-                  <button
-                    onClick={() => setShowLineupModal(true)}
-                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
-                  >
-                    Set Lineups
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-
-          {showSetupModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-              <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-                <h3 className="text-lg font-semibold mb-4">Set Up New Trip</h3>
-                <form onSubmit={handleSetupSubmit} className="grid gap-4">
-                  <p className="text-sm text-gray-600">Trip Id: {tempConfig.tripId}</p>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Number of Teams
-                    </label>
-                    <input
-                      type="number"
-                      name="numTeams"
-                      value={tempConfig.numTeams}
-                      onChange={handleSetupConfigChange}
-                      min="2"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Players per Team
-                    </label>
-                    <input
-                      type="number"
-                      name="playersPerTeam"
-                      value={tempConfig.playersPerTeam}
-                      onChange={handleSetupConfigChange}
-                      min="1"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Number of Rounds
-                    </label>
-                    <input
-                      type="number"
-                      name="numRounds"
-                      value={tempConfig.numRounds}
-                      onChange={handleSetupNumRoundsChange}
-                      min="1"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                  {Array.from({ length: tempConfig.numRounds }, (_, index) => (
-                    <div key={index}>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Scoring Method for Round {index + 1}
-                      </label>
-                      <select
-                        name="scoringMethod"
-                        value={tempConfig.scoringMethods[index]}
-                        onChange={(e) => handleSetupConfigChange(e, index)}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      >
-                        <option value="match">Match Play</option>
-                        <option value="stroke">Stroke Play</option>
-                      </select>
-                    </div>
-                  ))}
-                  {Array.from({ length: tempConfig.numRounds }, (_, index) => (
-                    <div key={`course-${index}`}>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Course for Round {index + 1}
-                      </label>
-                      <select
-                        name="course"
-                        value={tempConfig.courses[index]}
-                        onChange={(e) => handleSetupConfigChange(e, index)}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      >
-                        {golfCourses.map((course) => (
-                          <option key={course.name} value={course.name}>
-                            {course.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                  <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                    >
-                      Save Setup
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowSetupModal(false)}
-                      className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
+            </form>
+            <button
+              onClick={handleCreateNewTrip}
+              className="bg-[#facc15] hover:bg-[#eab308] text-[#0f172a] font-semibold py-3 px-6 rounded-lg shadow-md transition duration-200 w-full"
+            >
+              Create New Trip
+            </button>
+          </div>
+        ) : (
+          <div className="bg-white shadow-lg p-6 rounded-lg max-w-xl w-full mt-6">
+            <p className="mb-4 text-gray-800 font-semibold">Trip ID: {config.tripId}</p>
+            {!isLeader ? (
+              <form onSubmit={handlePinSubmit} className="space-y-2">
+                <input
+                  type="password"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 p-2"
+                  placeholder="Enter Leader PIN"
+                />
+                <button type="submit" className="w-full bg-[#0f172a] text-white py-2 rounded-md">
+                  Verify PIN
+                </button>
+              </form>
+            ) : (
+              <div>
+                <p className="text-green-600 font-medium">You are the trip leader.</p>
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className="mt-4 bg-[#0f172a] text-white px-6 py-2 rounded-md hover:bg-[#1e293b]"
+                >
+                  Go to Dashboard
+                </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
-          {showLineupModal && isLeader && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-              <div className="bg-white p-6 rounded-lg shadow-lg max-w-2xl w-full">
-                <h3 className="text-lg font-semibold mb-4">Set Lineups</h3>
-                <form onSubmit={handleLineupSubmit} className="grid gap-4">
-                  {config.teams.map((team, teamIndex) => (
-                    <div key={teamIndex}>
-                      <h4 className="text-md font-medium mb-2">{team.name}</h4>
-                      {Array.from({ length: config.numRounds }, (_, roundIndex) => (
-                        <div key={roundIndex} className="mb-4">
-                          <h5 className="text-sm font-medium mb-2">Round {roundIndex + 1}</h5>
-                          {team.players.map((player, playerIndex) => (
-                            <div key={playerIndex} className="flex items-center gap-2 mb-2">
-                              <span>{player.name}</span>
-                              <select
-                                value={player.lineupOrder[roundIndex]}
-                                onChange={(e) => handleLineupChange(teamIndex, roundIndex, playerIndex, parseInt(e.target.value))}
-                                className="mt-1 block w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                              >
-                                {Array.from({ length: config.playersPerTeam }, (_, i) => (
-                                  <option key={i} value={i}>{i + 1}</option>
-                                ))}
-                              </select>
-                            </div>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                  <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                    >
-                      Save Lineups
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowLineupModal(false)}
-                      className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-        </div>
+        {error && <p className="text-red-500 mt-4 font-medium">{error}</p>}
+
+        <p className="max-w-xl mt-10 text-gray-600 text-sm">
+          Keep score on your golf outings with team-based match play and stroke play formats. Create teams,
+          enter scores, and track your progress easily.
+        </p>
       </main>
+
+      {showSetupModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Set Up New Trip</h3>
+            <form onSubmit={handleSetupSubmit} className="grid gap-4 text-left">
+              <p className="text-sm text-gray-600">Trip ID: {tempConfig.tripId}</p>
+              <div>
+                <label className="block text-sm font-medium">Number of Teams</label>
+                <input
+                  type="number"
+                  name="numTeams"
+                  value={tempConfig.numTeams}
+                  onChange={handleSetupConfigChange}
+                  min="2"
+                  className="w-full border rounded p-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Players per Team</label>
+                <input
+                  type="number"
+                  name="playersPerTeam"
+                  value={tempConfig.playersPerTeam}
+                  onChange={handleSetupConfigChange}
+                  min="1"
+                  className="w-full border rounded p-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Number of Rounds</label>
+                <input
+                  type="number"
+                  name="numRounds"
+                  value={tempConfig.numRounds}
+                  onChange={handleSetupNumRoundsChange}
+                  min="1"
+                  className="w-full border rounded p-2"
+                />
+              </div>
+              {Array.from({ length: tempConfig.numRounds }).map((_, i) => (
+                <div key={i}>
+                  <label className="block text-sm font-medium">Scoring Method for Round {i + 1}</label>
+                  <select
+                    name="scoringMethod"
+                    value={tempConfig.scoringMethods[i]}
+                    onChange={(e) => handleSetupConfigChange(e, i)}
+                    className="w-full border rounded p-2"
+                  >
+                    <option value="match">Match Play</option>
+                    <option value="stroke">Stroke Play</option>
+                  </select>
+                </div>
+              ))}
+              {Array.from({ length: tempConfig.numRounds }).map((_, i) => (
+                <div key={`course-${i}`}>
+                  <label className="block text-sm font-medium">Course for Round {i + 1}</label>
+                  <select
+                    name="course"
+                    value={tempConfig.courses[i]}
+                    onChange={(e) => handleSetupConfigChange(e, i)}
+                    className="w-full border rounded p-2"
+                  >
+                    {golfCourses.map((course) => (
+                      <option key={course.name} value={course.name}>
+                        {course.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+              <div className="flex gap-2 mt-4 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowSetupModal(false)}
+                  className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                >
+                  Save & Start
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </div>
   );
-}
+};
 
 export default HomePage;
