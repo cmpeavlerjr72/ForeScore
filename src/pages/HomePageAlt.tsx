@@ -5,21 +5,21 @@ import { saveConfig, loadConfig, generateTripId } from '../utils/storage';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { GolfCourse, golfCourses } from '../types/GolfCourse';
+import ForeScoreLogo from '../assets/ForeScore.png';
+
 
 interface HomePageProps {
   config: EventConfig;
   setConfig: React.Dispatch<React.SetStateAction<EventConfig>>;
 }
 
-function HomePage({ config, setConfig }: HomePageProps) {
+const HomePage: React.FC<HomePageProps> = ({ config, setConfig }) => {
   const navigate = useNavigate();
   const [tripIdInput, setTripIdInput] = useState('');
   const [pin, setPin] = useState('');
   const [isLeader, setIsLeader] = useState(false);
   const [error, setError] = useState('');
   const [showSetupModal, setShowSetupModal] = useState(false);
-  const [showLineupModal, setShowLineupModal] = useState(false);
-
   const [tempConfig, setTempConfig] = useState<EventConfig>(() => {
     const numTeams = 2;
     const playersPerTeam = 4;
@@ -37,22 +37,32 @@ function HomePage({ config, setConfig }: HomePageProps) {
       numTeams,
       playersPerTeam,
       numRounds,
-      scoringMethods: Array(numRounds).fill('match'),
+      scoringMethods: ['match', 'match', 'match'],
       courses: Array(numRounds).fill('True Blue'),
       teams,
     };
   });
 
   useEffect(() => {
-    if (tripIdInput) {
-      const savedConfig = loadConfig(tripIdInput);
-      if (savedConfig) {
-        setConfig(savedConfig);
+    const fetchTripFromDatabase = async () => {
+      try {
+        const response = await fetch(`https://forescore-db.onrender.com/api/trips/${tripIdInput}`);
+        if (!response.ok) {
+          setError('No trip found with this ID');
+          return;
+        }
+        const data = await response.json();
+        setConfig(data);
         navigate('/dashboard');
         setError('');
-      } else {
-        setError('No trip found with this ID');
+      } catch (err) {
+        console.error(err);
+        setError('Error loading trip from server');
       }
+    };
+  
+    if (tripIdInput) {
+      fetchTripFromDatabase();
     }
   }, [tripIdInput, setConfig, navigate]);
 
@@ -80,24 +90,106 @@ function HomePage({ config, setConfig }: HomePageProps) {
     setError('');
   };
 
+  const handleSetupConfigChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    index?: number
+  ) => {
+    const { name, value } = e.target;
+    setTempConfig((prev) => {
+      if (name === 'scoringMethod' && index !== undefined) {
+        const newScoringMethods = [...prev.scoringMethods];
+        newScoringMethods[index] = value as 'match' | 'stroke';
+        return { ...prev, scoringMethods: newScoringMethods };
+      }
+      if (name === 'course' && index !== undefined) {
+        const newCourses = [...prev.courses];
+        newCourses[index] = value;
+        return { ...prev, courses: newCourses };
+      }
+      const updatedValue = parseInt(value);
+      if (name === 'numTeams' || name === 'playersPerTeam') {
+        const newNumTeams = name === 'numTeams' ? updatedValue : prev.numTeams;
+        const newPlayersPerTeam = name === 'playersPerTeam' ? updatedValue : prev.playersPerTeam;
+        const newTeams = Array.from({ length: newNumTeams }, (_, teamIndex) => ({
+          name: `Team ${teamIndex + 1}`,
+          players: Array.from({ length: newPlayersPerTeam }, (_, playerIndex) => ({
+            name: `Player ${playerIndex + 1}`,
+            scores: Array(prev.numRounds).fill(0),
+            lineupOrder: Array(prev.numRounds).fill(playerIndex),
+          })),
+        }));
+        return {
+          ...prev,
+          [name]: updatedValue,
+          teams: newTeams,
+        };
+      }
+      return { ...prev, [name]: updatedValue };
+    });
+  };
+
+  const handleSetupNumRoundsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newNumRounds = parseInt(e.target.value);
+    setTempConfig((prev) => {
+      const newTeams = prev.teams.map((team) => ({
+        ...team,
+        players: team.players.map((player) => ({
+          ...player,
+          scores: Array(newNumRounds).fill(0),
+          lineupOrder: Array(newNumRounds).fill(0),
+        })),
+      }));
+      const newCourses = Array(newNumRounds).fill('True Blue');
+      const newMethods = Array(newNumRounds).fill('match');
+      return {
+        ...prev,
+        numRounds: newNumRounds,
+        courses: newCourses,
+        scoringMethods: newMethods,
+        teams: newTeams,
+      };
+    });
+  };
+
+  const handleSetupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setConfig(tempConfig);
+    saveConfig(tempConfig);
+  
+    try {
+      const response = await fetch('https://forescore-db.onrender.com/api/trips/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tempConfig),
+      });
+  
+      if (!response.ok) throw new Error('Failed to save trip');
+      console.log('Trip saved to DB');
+    } catch (err) {
+      console.error(err);
+    }
+  
+    setShowSetupModal(false);
+    setIsLeader(true);
+    navigate('/dashboard');
+  };
+
   return (
     <div className="min-h-screen bg-[#fdfdfb] flex flex-col">
-      {/* Header */}
-      <header className="w-full bg-[#0f172a] text-white py-4 px-6 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="bg-white rounded-full w-8 h-8 flex items-center justify-center">
-            <span className="text-[#0f172a] font-bold text-sm">FS</span>
-          </div>
-          <span className="text-xl font-semibold">ForeScore</span>
-        </div>
-      </header>
+      {/* Custom Header */}
+      <Header title="ForeScore" showNav={false} />
 
-      {/* Main Hero Section */}
+      {/* Hero Section */}
       <main className="flex-grow container mx-auto flex flex-col items-center justify-center px-4 py-10 text-center">
-        <h1 className="text-4xl md:text-5xl font-bold text-[#0f172a] mb-3">ForeScore</h1>
-        <p className="text-lg text-gray-700 mb-6">Your Ultimate Golf Trip Scorekeeper</p>
+        {/* Logo */}
+        <img
+          src={ForeScoreLogo}
+          alt="ForeScore Logo"
+          className="w-64 h-64 md:w-80 md:h-80"
 
-        {!config.tripId ? (
+        />
+        <p className="text-lg text-gray-700 mb-6">Your Ultimate Golf Trip Scorekeeper</p>
+              {!config.tripId ? (
           <div className="space-y-4 w-full max-w-md">
             <form onSubmit={handleTripIdSubmit} className="flex gap-2">
               <input
@@ -156,9 +248,99 @@ function HomePage({ config, setConfig }: HomePageProps) {
         </p>
       </main>
 
+      {showSetupModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Set Up New Trip</h3>
+            <form onSubmit={handleSetupSubmit} className="grid gap-4 text-left">
+              <p className="text-sm text-gray-600">Trip ID: {tempConfig.tripId}</p>
+              <div>
+                <label className="block text-sm font-medium">Number of Teams</label>
+                <input
+                  type="number"
+                  name="numTeams"
+                  value={tempConfig.numTeams}
+                  onChange={handleSetupConfigChange}
+                  min="2"
+                  className="w-full border rounded p-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Players per Team</label>
+                <input
+                  type="number"
+                  name="playersPerTeam"
+                  value={tempConfig.playersPerTeam}
+                  onChange={handleSetupConfigChange}
+                  min="1"
+                  className="w-full border rounded p-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Number of Rounds</label>
+                <input
+                  type="number"
+                  name="numRounds"
+                  value={tempConfig.numRounds}
+                  onChange={handleSetupNumRoundsChange}
+                  min="1"
+                  className="w-full border rounded p-2"
+                />
+              </div>
+              {Array.from({ length: tempConfig.numRounds }).map((_, i) => (
+                <div key={i}>
+                  <label className="block text-sm font-medium">Scoring Method for Round {i + 1}</label>
+                  <select
+                    name="scoringMethod"
+                    value={tempConfig.scoringMethods[i]}
+                    onChange={(e) => handleSetupConfigChange(e, i)}
+                    className="w-full border rounded p-2"
+                  >
+                    <option value="match">Match Play</option>
+                    <option value="stroke">Stroke Play</option>
+                  </select>
+                </div>
+              ))}
+              {Array.from({ length: tempConfig.numRounds }).map((_, i) => (
+                <div key={`course-${i}`}>
+                  <label className="block text-sm font-medium">Course for Round {i + 1}</label>
+                  <select
+                    name="course"
+                    value={tempConfig.courses[i]}
+                    onChange={(e) => handleSetupConfigChange(e, i)}
+                    className="w-full border rounded p-2"
+                  >
+                    {golfCourses.map((course) => (
+                      <option key={course.name} value={course.name}>
+                        {course.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+              <div className="flex gap-2 mt-4 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowSetupModal(false)}
+                  className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                >
+                  Save & Start
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </div>
   );
-}
+};
 
 export default HomePage;
