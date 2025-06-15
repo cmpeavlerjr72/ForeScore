@@ -5,7 +5,7 @@ import { saveConfig, loadConfig, generateTripId } from '../utils/storage';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { GolfCourse, golfCourses } from '../types/GolfCourse';
-import ForeScoreLogo from '../assets/ForeScore.png';
+import ForeScoreLogo from '../assets/ForeScore.png'; // Re-enabled since file exists
 
 const SOCKET_URL = 'https://forescore-db.onrender.com'; // Corrected URL
 
@@ -175,13 +175,11 @@ const HomePage: React.FC<HomePageProps> = ({ config, setConfig }) => {
       const data = await response.json();
       console.log('Trip saved to server:', data.message);
       setShowTripIdModal(true); // Show popup without immediate navigation
-    } catch (err) {
+    } catch (err: any) { // Type as 'any' to access message
       console.error('Error saving trip:', err.message);
       setError(`Failed to save trip: ${err.message}`);
       return;
     }
-
-    // No immediate navigation or timeout
   };
 
   const handleCloseTripIdModal = () => {
@@ -195,7 +193,7 @@ const HomePage: React.FC<HomePageProps> = ({ config, setConfig }) => {
     <div className="min-h-screen bg-[#fdfdfb] flex flex-col">
       <Header title="ForeScore" showNav={false} />
       <main className="flex-grow container mx-auto flex flex-col items-center justify-center px-4 py-10 text-center">
-        <img src={ForeScoreLogo} alt="ForeScore Logo" className="w-64 h-64 md:w-80 md:h-80" />
+        <img src={ForeScoreLogo} alt="ForeScore Logo" className="w-64 h-64 md:w-80 md:h-80" /> {/* Re-enabled */}
         <p className="text-lg text-gray-700 mb-6">Your Ultimate Golf Trip Scorekeeper</p>
         {!config.tripId ? (
           <div className="space-y-4 w-full max-w-md">

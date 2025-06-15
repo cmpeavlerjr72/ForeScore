@@ -27,13 +27,21 @@ const RoundScoreboard: React.FC<RoundScoreboardProps> = ({ config }) => {
     return playerScore;
   };
 
-  const calculateScoreToPar = (scores: number[], course: GolfCourse) => {
+  const calculateScoreToPar = (scores: number | number[], course: GolfCourse) => {
     let score = 0;
     let thru = 0;
-    for (let i = 0; i < scores.length; i++) {
-      if (scores[i] > 0) {
-        score += scores[i] - course.par[i];
-        thru++;
+    if (Array.isArray(scores)) {
+      for (let i = 0; i < scores.length; i++) {
+        if (scores[i] > 0) {
+          score += scores[i] - (course.par[i] || course.par[0] || 0); // Use first par if index exceeds
+          thru++;
+        }
+      }
+    } else {
+      // Handle single number case
+      if (scores > 0) {
+        score = scores - (course.par[0] || 0); // Use first par as baseline
+        thru = 1;
       }
     }
     return { scoreToPar: score, thru };

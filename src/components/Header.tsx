@@ -4,6 +4,7 @@ import whiteLogo from '../assets/ForeScore_white.png';
 
 interface HeaderProps {
   showNav?: boolean;
+  title?: string;
 }
 
 const Header: React.FC<HeaderProps> = ({ showNav = true }) => {

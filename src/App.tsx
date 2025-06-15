@@ -31,12 +31,13 @@ const App: React.FC = () => {
     courses: ['True Blue', 'True Blue', 'True Blue'], // Default courses
     teams: [],
   });
+  const [showDashboard, setShowDashboard] = useState(false); // Add state for dashboard visibility
 
   return (
     <Router>
       <Routes>
         <Route path="/" element={<HomePage config={config} setConfig={setConfig} />} />
-        <Route path="/dashboard" element={<Dashboard config={config} setConfig={setConfig} />} />
+        <Route path="/dashboard" element={<Dashboard config={config} setConfig={setConfig} setShowDashboard={setShowDashboard} />} />
         <Route path="/round-scoreboard" element={<RoundScoreboard config={config} />} />
       </Routes>
     </Router>
