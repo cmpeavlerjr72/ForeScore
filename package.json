@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && npx vite build",
     "preview": "vite preview",
-    "prebuild": "echo Skipping prebuild",
+    "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
