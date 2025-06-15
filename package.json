@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && npx vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -26,5 +26,8 @@
     "@vitejs/plugin-react": "^4.0.3",
     "typescript": "^5.0.2",
     "vite": "^4.4.5"
+  },
+  "engines": {
+    "node": ">=18.16.0"
   }
 }
