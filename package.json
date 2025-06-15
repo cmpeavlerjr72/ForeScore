@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "chmod +x ./node_modules/.bin/vite",
-  "build": "tsc && ./node_modules/.bin/vite build",
-  "preview": "vite preview"
+    "build": "tsc && npx vite build",
+    "preview": "vite preview",
+    "prebuild": "echo Skipping prebuild" 
   },
   "dependencies": {
     "chart.js": "^4.4.9",
