@@ -39,6 +39,7 @@ const HomePage: React.FC = () => {
       console.log('Login success:', data);
       // ✅ Store username in localStorage for use in Profile.tsx
       localStorage.setItem('username', loginUsername);
+      
       navigate('/profile');
     } catch (err: any) {
       console.error('Login failed:', err.message);

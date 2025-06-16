@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage';
 import Dashboard from './pages/Dashboard';
 import RoundScoreboard from './pages/RoundScoreboard';
 import Profile from './pages/Profile';
+import PlayerScoreEntry from './pages/PlayerScoreEntry';
 
 export interface EventConfig {
   tripId: string;
@@ -52,6 +53,7 @@ const App: React.FC = () => {
         <Route path="/dashboard/:tripId" element={<Dashboard />} />
         <Route path="/round-scoreboard/:tripId" element={<RoundScoreboard />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/enter-scores/:tripId" element={<PlayerScoreEntry />} />
       </Routes>
     </Router>
   );

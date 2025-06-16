@@ -12,7 +12,9 @@ interface User {
   username: string;
   name: string;
   handicap: number;
-  trips: string[];
+  trips: {
+    [tripId: string]: number[][]; // each trip ID maps to an array of round score arrays
+  };
 }
 
 const Profile: React.FC = () => {
@@ -36,6 +38,10 @@ const Profile: React.FC = () => {
         if (!res.ok) throw new Error('User not found');
         const data = await res.json();
         setUser(data);
+
+        localStorage.setItem('username', data.username);
+        localStorage.setItem('handicap', String(Math.round(data.handicap || 0)));
+
       } catch (err) {
         setError('Failed to load user profile');
       }
@@ -198,9 +204,26 @@ const Profile: React.FC = () => {
             </button>
           </div>
 
-          {user && user.trips.length > 0 ? (
+          {/* Always show input to add trip */}
+          <div className="mb-4">
+            <input
+              type="text"
+              value={newTripId}
+              onChange={(e) => setNewTripId(e.target.value)}
+              placeholder="Enter Trip ID"
+              className="border p-2 rounded mr-2"
+            />
+            <button
+              onClick={handleAddTrip}
+              className="bg-blue-600 text-white px-4 py-2 rounded"
+            >
+              Add Trip
+            </button>
+          </div>
+
+          {user && Object.keys(user.trips || {}).length > 0 ? (
             <ul className="space-y-2">
-              {user.trips.map((tripId) => (
+              {Object.keys(user.trips).map((tripId) => (
                 <li key={tripId}>
                   <button
                     onClick={() => handleTripClick(tripId)}
@@ -212,29 +235,14 @@ const Profile: React.FC = () => {
               ))}
             </ul>
           ) : (
-            <div>
-              <p className="text-gray-600 mb-2">No trips found.</p>
-              <input
-                type="text"
-                value={newTripId}
-                onChange={(e) => setNewTripId(e.target.value)}
-                placeholder="Enter Trip ID"
-                className="border p-2 rounded mr-2"
-              />
-              <button
-                onClick={handleAddTrip}
-                className="bg-blue-600 text-white px-4 py-2 rounded"
-              >
-                Add Trip
-              </button>
-            </div>
+            <p className="text-gray-600 mb-2">No trips found.</p>
           )}
 
           {error && <p className="text-red-500 mt-4">{error}</p>}
         </section>
       </main>
 
-      {/* Trip Setup Modal */}
+      {/* Trip Setup Modal (unchanged) */}
       {showSetupModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
