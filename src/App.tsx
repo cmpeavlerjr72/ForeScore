@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import Dashboard from './pages/Dashboard';
 import RoundScoreboard from './pages/RoundScoreboard';
+import Profile from './pages/Profile';
 
 export interface EventConfig {
   tripId: string;
@@ -21,6 +22,17 @@ export interface EventConfig {
   }[];
 }
 
+export const defaultEventConfig: EventConfig = {
+  tripId: '',
+  numTeams: 2,
+  playersPerTeam: 4,
+  numRounds: 3,
+  scoringMethods: ['match', 'match', 'match'],
+  courses: ['True Blue', 'True Blue', 'True Blue'],
+  teams: [],
+};
+
+
 const App: React.FC = () => {
   const [config, setConfig] = useState<EventConfig>({
     tripId: '',
@@ -36,9 +48,10 @@ const App: React.FC = () => {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<HomePage config={config} setConfig={setConfig} />} />
-        <Route path="/dashboard" element={<Dashboard config={config} setConfig={setConfig} setShowDashboard={setShowDashboard} />} />
-        <Route path="/round-scoreboard" element={<RoundScoreboard config={config} />} />
+        <Route path="/" element={<HomePage/>} />
+        <Route path="/dashboard/:tripId" element={<Dashboard />} />
+        <Route path="/round-scoreboard/:tripId" element={<RoundScoreboard />} />
+        <Route path="/profile" element={<Profile />} />
       </Routes>
     </Router>
   );

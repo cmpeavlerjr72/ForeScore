@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, ChartOptions } from 'chart.js';
 import {
@@ -10,9 +11,9 @@ import {
   Legend,
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
-import { EventConfig } from '../App';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { EventConfig } from '../App';
 
 ChartJS.register(
   CategoryScale,
@@ -24,30 +25,49 @@ ChartJS.register(
   ChartDataLabels
 );
 
-interface DashboardProps {
-  config: EventConfig;
-  setConfig: React.Dispatch<React.SetStateAction<EventConfig>>;
-  setShowDashboard: React.Dispatch<React.SetStateAction<boolean>>;
-}
+const SOCKET_URL = 'https://forescore-db.onrender.com';
 
-const Dashboard: React.FC<DashboardProps> = ({
-  config,
-  setConfig,
-  setShowDashboard,
-}) => {
+const Dashboard: React.FC = () => {
+  const { tripId } = useParams();
+  const [config, setConfig] = useState<EventConfig | null>(null);
+  const [editScores, setEditScores] = useState<string[][][]>([]);
   const [isEditing, setIsEditing] = useState(false);
-  const [editScores, setEditScores] = useState(
-    config.teams.map((team) =>
-      team.players.map((player) =>
-        player.scores.map((score) => score.toString())
-      )
-    )
-  );
+
+  useEffect(() => {
+    const fetchTrip = async () => {
+      if (!tripId) return;
+      try {
+        const res = await fetch(`${SOCKET_URL}/trips/${tripId}`);
+        if (!res.ok) throw new Error('Failed to fetch trip');
+        const data = await res.json();
+        setConfig(data);
+        setEditScores(
+          data.teams.map((team: any) =>
+            team.players.map((player: any) =>
+              player.scores.map((score: number) => score.toString())
+            )
+          )
+        );
+      } catch (err) {
+        console.error('Error loading trip:', err);
+      }
+    };
+
+    fetchTrip();
+  }, [tripId]);
+
+  if (!config) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-600 text-lg">Loading trip data...</p>
+      </div>
+    );
+  }
 
   const calculateTotalScores = () => {
     return config.teams.map((team, teamIndex) => {
       let totalTeamScore = 0;
-      team.players.forEach((player, playerIndex) => {
+      team.players.forEach((player) => {
         player.scores.forEach((score, roundIndex) => {
           const opponentTeamIndex = teamIndex === 0 ? 1 : 0;
           const opponentPlayerIndex =
@@ -127,34 +147,27 @@ const Dashboard: React.FC<DashboardProps> = ({
     roundIndex: number,
     value: string
   ) => {
-    const newEditScores = [...editScores];
-    newEditScores[teamIndex][playerIndex][roundIndex] = value;
-    setEditScores(newEditScores);
+    const updatedScores = [...editScores];
+    updatedScores[teamIndex][playerIndex][roundIndex] = value;
+    setEditScores(updatedScores);
   };
 
   const handleSaveScores = () => {
-    const newTeams = config.teams.map((team, teamIndex) => ({
+    const updatedTeams = config.teams.map((team, teamIndex) => ({
       ...team,
       players: team.players.map((player, playerIndex) => ({
         ...player,
-        scores: editScores[teamIndex][playerIndex].map((score) =>
-          parseInt(score) || 0
-        ),
+        scores: editScores[teamIndex][playerIndex].map((s) => parseInt(s) || 0),
       })),
     }));
-    setConfig((prev) => ({ ...prev, teams: newTeams }));
+    setConfig({ ...config, teams: updatedTeams });
     setIsEditing(false);
-  };
-
-  const handleBackToConfig = () => {
-    setShowDashboard(false);
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fdfdfb]">
       <Header showNav />
       <main className="flex-grow container mx-auto px-4 py-10">
-        {/* Chart Section */}
         <section className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-xl font-semibold text-[#0f172a] mb-4">
             Team Score Totals
@@ -162,7 +175,6 @@ const Dashboard: React.FC<DashboardProps> = ({
           <Bar data={chartData} options={chartOptions} />
         </section>
 
-        {/* Scores Table */}
         <section className="bg-white rounded-lg shadow-md p-6">
           {config.teams.map((team, teamIndex) => (
             <div key={teamIndex} className="mb-8">
@@ -190,9 +202,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             {isEditing ? (
                               <input
                                 type="number"
-                                value={
-                                  editScores[teamIndex][playerIndex][roundIndex]
-                                }
+                                value={editScores[teamIndex][playerIndex][roundIndex]}
                                 onChange={(e) =>
                                   handleScoreChange(
                                     teamIndex,
@@ -216,14 +226,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
           ))}
 
-          {/* Buttons */}
           <div className="flex flex-wrap gap-4 mt-6">
-            <button
-              onClick={handleBackToConfig}
-              className="bg-gray-300 text-gray-800 px-5 py-2 rounded-md hover:bg-gray-400 transition"
-            >
-              Back to Configuration
-            </button>
             {isEditing ? (
               <button
                 onClick={handleSaveScores}

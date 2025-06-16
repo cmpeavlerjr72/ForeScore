@@ -5,8 +5,9 @@ import { saveConfig, loadConfig, generateTripId } from '../utils/storage';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { GolfCourse, golfCourses } from '../types/GolfCourse';
-import ForeScoreLogo from '../assets/ForeScore.png';
+import ForeScoreLogo from '../assets/ForeScore.png'; // Re-enabled since file exists
 
+const SOCKET_URL = 'https://forescore-db.onrender.com'; // Corrected URL
 
 interface HomePageProps {
   config: EventConfig;
@@ -27,6 +28,7 @@ const HomePage: React.FC<HomePageProps> = ({ config, setConfig }) => {
     const teams = Array.from({ length: numTeams }, (_, teamIndex) => ({
       name: `Team ${teamIndex + 1}`,
       players: Array.from({ length: playersPerTeam }, (_, playerIndex) => ({
+        id: playerIndex + 1,
         name: `Player ${playerIndex + 1}`,
         scores: Array(numRounds).fill(0),
         lineupOrder: Array(numRounds).fill(playerIndex),
@@ -42,11 +44,12 @@ const HomePage: React.FC<HomePageProps> = ({ config, setConfig }) => {
       teams,
     };
   });
+  const [showTripIdModal, setShowTripIdModal] = useState(false);
 
   useEffect(() => {
-    const fetchTripFromDatabase = async () => {
+    const fetchTripFromServer = async () => {
       try {
-        const response = await fetch(`https://forescore-db.onrender.com/api/trips/${tripIdInput}`);
+        const response = await fetch(`${SOCKET_URL}/trips/${tripIdInput}`);
         if (!response.ok) {
           setError('No trip found with this ID');
           return;
@@ -60,9 +63,9 @@ const HomePage: React.FC<HomePageProps> = ({ config, setConfig }) => {
         setError('Error loading trip from server');
       }
     };
-  
+
     if (tripIdInput) {
-      fetchTripFromDatabase();
+      fetchTripFromServer();
     }
   }, [tripIdInput, setConfig, navigate]);
 
@@ -113,6 +116,7 @@ const HomePage: React.FC<HomePageProps> = ({ config, setConfig }) => {
         const newTeams = Array.from({ length: newNumTeams }, (_, teamIndex) => ({
           name: `Team ${teamIndex + 1}`,
           players: Array.from({ length: newPlayersPerTeam }, (_, playerIndex) => ({
+            id: playerIndex + 1,
             name: `Player ${playerIndex + 1}`,
             scores: Array(prev.numRounds).fill(0),
             lineupOrder: Array(prev.numRounds).fill(playerIndex),
@@ -153,43 +157,45 @@ const HomePage: React.FC<HomePageProps> = ({ config, setConfig }) => {
 
   const handleSetupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Submitting tempConfig:', tempConfig);
     setConfig(tempConfig);
     saveConfig(tempConfig);
-  
+
     try {
-      const response = await fetch('https://forescore-db.onrender.com/api/trips/create', {
+      const response = await fetch(`${SOCKET_URL}/trips`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(tempConfig),
       });
-  
-      if (!response.ok) throw new Error('Failed to save trip');
-      console.log('Trip saved to DB');
-    } catch (err) {
-      console.error(err);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to save trip: ${response.status} - ${errorText || 'No additional details'}`);
+      }
+      const data = await response.json();
+      console.log('Trip saved to server:', data.message);
+      setShowTripIdModal(true); // Show popup without immediate navigation
+    } catch (err: any) { // Type as 'any' to access message
+      console.error('Error saving trip:', err.message);
+      setError(`Failed to save trip: ${err.message}`);
+      return;
     }
-  
+  };
+
+  const handleCloseTripIdModal = () => {
+    setShowTripIdModal(false);
     setShowSetupModal(false);
     setIsLeader(true);
-    navigate('/dashboard');
+    navigate('/dashboard'); // Navigate only on close
   };
 
   return (
     <div className="min-h-screen bg-[#fdfdfb] flex flex-col">
-      {/* Custom Header */}
       <Header title="ForeScore" showNav={false} />
-
-      {/* Hero Section */}
       <main className="flex-grow container mx-auto flex flex-col items-center justify-center px-4 py-10 text-center">
-        {/* Logo */}
-        <img
-          src={ForeScoreLogo}
-          alt="ForeScore Logo"
-          className="w-64 h-64 md:w-80 md:h-80"
-
-        />
+        <img src={ForeScoreLogo} alt="ForeScore Logo" className="w-64 h-64 md:w-80 md:h-80" /> {/* Re-enabled */}
         <p className="text-lg text-gray-700 mb-6">Your Ultimate Golf Trip Scorekeeper</p>
-              {!config.tripId ? (
+        {!config.tripId ? (
           <div className="space-y-4 w-full max-w-md">
             <form onSubmit={handleTripIdSubmit} className="flex gap-2">
               <input
@@ -239,15 +245,12 @@ const HomePage: React.FC<HomePageProps> = ({ config, setConfig }) => {
             )}
           </div>
         )}
-
         {error && <p className="text-red-500 mt-4 font-medium">{error}</p>}
-
         <p className="max-w-xl mt-10 text-gray-600 text-sm">
           Keep score on your golf outings with team-based match play and stroke play formats. Create teams,
           enter scores, and track your progress easily.
         </p>
       </main>
-
       {showSetupModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
@@ -337,7 +340,21 @@ const HomePage: React.FC<HomePageProps> = ({ config, setConfig }) => {
           </div>
         </div>
       )}
-
+      {showTripIdModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md text-center">
+            <h3 className="text-lg font-semibold mb-4">Trip Created!</h3>
+            <p className="text-gray-700 mb-4">Save this Trip ID to view later:</p>
+            <p className="bg-gray-100 p-2 rounded font-mono text-lg">{tempConfig.tripId}</p>
+            <button
+              onClick={handleCloseTripIdModal}
+              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
       <Footer />
     </div>
   );
