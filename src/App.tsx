@@ -24,6 +24,11 @@ export interface EventConfig {
       lineupOrder: number[];
     }[];
   }[];
+  lineups?: {
+    [roundIndex: string]: {
+      [groupIndex: string]: string[];
+    };
+  };
 }
 
 export const defaultEventConfig: EventConfig = {

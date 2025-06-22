@@ -1,15 +1,32 @@
-import React, { useState } from 'react';
-import { EventConfig } from '../App';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { GolfCourse, golfCourses } from '../types/GolfCourse';
+import { EventConfig } from '../App';
 
-interface RoundScoreboardProps {
-  config: EventConfig;
-}
 
-const RoundScoreboard: React.FC<RoundScoreboardProps> = ({ config }) => {
+const SOCKET_URL = 'https://forescore-db.onrender.com';
+
+const RoundScoreboard: React.FC = () => {
+  const { tripId } = useParams();
+  const [config, setConfig] = useState<EventConfig | null>(null);
   const [activeTab, setActiveTab] = useState<'individual' | 'team'>('individual');
+
+  useEffect(() => {
+    const fetchTrip = async () => {
+      if (!tripId) return;
+      try {
+        const response = await fetch(`${SOCKET_URL}/trips/${tripId}`);
+        const data = await response.json();
+        setConfig(data);
+      } catch (err) {
+        console.error('Failed to load trip:', err);
+      }
+    };
+
+    fetchTrip();
+  }, [tripId]);
 
   const getCourseData = (courseName: string): GolfCourse | undefined =>
     golfCourses.find((course) => course.name === courseName);
@@ -33,19 +50,20 @@ const RoundScoreboard: React.FC<RoundScoreboardProps> = ({ config }) => {
     if (Array.isArray(scores)) {
       for (let i = 0; i < scores.length; i++) {
         if (scores[i] > 0) {
-          score += scores[i] - (course.par[i] || course.par[0] || 0); // Use first par if index exceeds
+          score += scores[i] - (course.par[i] || course.par[0] || 0);
           thru++;
         }
       }
     } else {
-      // Handle single number case
       if (scores > 0) {
-        score = scores - (course.par[0] || 0); // Use first par as baseline
+        score = scores - (course.par[0] || 0);
         thru = 1;
       }
     }
     return { scoreToPar: score, thru };
   };
+
+  if (!config) return null;
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -97,10 +115,9 @@ const RoundScoreboard: React.FC<RoundScoreboardProps> = ({ config }) => {
                       </table>
                     </div>
 
-                    {/* Stroke Play Tabbed View */}
+                    {/* Stroke vs Match View */}
                     {scoringMethod === 'stroke' ? (
                       <>
-                        {/* Tabs */}
                         <div className="flex gap-4 mb-4">
                           <button
                             className={`px-4 py-2 rounded-t-md font-medium ${
@@ -195,7 +212,6 @@ const RoundScoreboard: React.FC<RoundScoreboardProps> = ({ config }) => {
                         )}
                       </>
                     ) : (
-                      // Match Play View
                       <div className="space-y-8">
                         {config.teams[0].players.map((player1, playerIndex1) => {
                           const player2 = config.teams[1].players.find(
