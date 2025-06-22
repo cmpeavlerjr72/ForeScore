@@ -81,9 +81,13 @@ const Profile: React.FC = () => {
 
   const handleCreateNewTrip = () => {
     const newId = generateTripId();
+    const storedUsername = localStorage.getItem('username') || '';
     setTempConfig({
       ...defaultEventConfig,
       tripId: newId,
+      tripLeader: storedUsername,
+      users: []
+
     });
     setShowSetupModal(true);
   };
@@ -152,30 +156,32 @@ const Profile: React.FC = () => {
 
   const handleSetupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+  
+    if (!user) return;
+  
+    // Ensure tripLeader and users[] are set properly before submission
+    const completeConfig = {
+      ...tempConfig,
+      tripLeader: user.username,
+      users: [user.username], // Add trip leader as first user
+    };
+  
     try {
       const res = await fetch(`${SOCKET_URL}/trips`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tempConfig),
+        body: JSON.stringify(completeConfig),
       });
       const tripResponse = await res.json();
-
-      // Link trip to user
-      if (user) {
-        await fetch(`${SOCKET_URL}/users/${user.username}/add-trip`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tripId: tempConfig.tripId }),
-        });
-      }
-
+  
       setShowSetupModal(false);
-      navigate(`/dashboard/${tempConfig.tripId}`, { state: { config: tempConfig } });
+      navigate(`/dashboard/${tempConfig.tripId}`, { state: { config: completeConfig } });
     } catch (err: any) {
       console.error('Failed to save trip:', err.message);
       setError('Failed to save trip');
     }
   };
+  
 
   return (
     <div className="min-h-screen bg-[#fdfdfb] flex flex-col">

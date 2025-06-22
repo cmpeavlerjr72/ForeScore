@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import RoundScoreboard from './pages/RoundScoreboard';
 import Profile from './pages/Profile';
 import PlayerScoreEntry from './pages/PlayerScoreEntry';
+import SetLineup from './pages/SetLineup';
 
 export interface EventConfig {
   tripId: string;
@@ -13,6 +14,8 @@ export interface EventConfig {
   numRounds: number;
   scoringMethods: ('match' | 'stroke')[];
   courses: string[]; // Added to store selected courses for each round
+  tripLeader?: string;
+  users?: string[];
   teams: {
     name: string;
     players: {
@@ -31,6 +34,8 @@ export const defaultEventConfig: EventConfig = {
   scoringMethods: ['match', 'match', 'match'],
   courses: ['True Blue', 'True Blue', 'True Blue'],
   teams: [],
+  tripLeader: '',
+  users: []
 };
 
 
@@ -54,6 +59,7 @@ const App: React.FC = () => {
         <Route path="/round-scoreboard/:tripId" element={<RoundScoreboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/enter-scores/:tripId" element={<PlayerScoreEntry />} />
+        <Route path="/set-lineup/:tripId" element={<SetLineup />} />
       </Routes>
     </Router>
   );

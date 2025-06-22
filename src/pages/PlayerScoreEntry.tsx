@@ -15,6 +15,7 @@ const PlayerScoreEntry: React.FC = () => {
   const [courseData, setCourseData] = useState<GolfCourse | null>(null);
   const [message, setMessage] = useState('');
 
+  // Fetch trip and score data when user and trip are ready
   useEffect(() => {
     const storedUsername = localStorage.getItem('username');
     const storedHandicap = localStorage.getItem('handicap');
@@ -24,8 +25,14 @@ const PlayerScoreEntry: React.FC = () => {
     }
     setUsername(storedUsername);
     setPlayerHandicap(Math.round(parseFloat(storedHandicap || '0')));
-    fetchTripData();
   }, [navigate, tripId]);
+
+  useEffect(() => {
+    if (username && tripId) {
+      fetchTripData();
+      fetchSavedScores();
+    }
+  }, [username, tripId]);
 
   const fetchTripData = async () => {
     try {
@@ -36,6 +43,18 @@ const PlayerScoreEntry: React.FC = () => {
       if (courseInfo) setCourseData(courseInfo);
     } catch (err) {
       console.error('Failed to fetch course data:', err);
+    }
+  };
+
+  const fetchSavedScores = async () => {
+    try {
+      const res = await fetch(`${SOCKET_URL}/users/${username}/trips/${tripId}/scores`);
+      const data = await res.json();
+      if (Array.isArray(data.raw) && data.raw.length === 18) {
+        setScores(data.raw);
+      }
+    } catch (err) {
+      console.error('Failed to fetch saved scores:', err);
     }
   };
 
@@ -70,10 +89,13 @@ const PlayerScoreEntry: React.FC = () => {
   const handleSubmit = async () => {
     if (!username || !tripId) return;
     try {
-      const res = await fetch(`${SOCKET_URL}/users/${username}/trips/${tripId}/submit-scores`, {
+      const res = await fetch(`${SOCKET_URL}/users/${username}/trips/${tripId}/save-scores`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scores }),
+        body: JSON.stringify({
+          raw: scores,
+          net: netScores
+        }),
       });
 
       if (!res.ok) throw new Error('Failed to submit scores');

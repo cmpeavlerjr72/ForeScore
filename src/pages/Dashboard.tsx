@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, ChartOptions } from 'chart.js';
 import {
@@ -29,9 +29,10 @@ const SOCKET_URL = 'https://forescore-db.onrender.com';
 
 const Dashboard: React.FC = () => {
   const { tripId } = useParams();
+  const navigate = useNavigate();
   const [config, setConfig] = useState<EventConfig | null>(null);
   const [editScores, setEditScores] = useState<string[][][]>([]);
-  const [isEditing, setIsEditing] = useState(false);
+  const currentUsername = localStorage.getItem('username') || ''; // ✅ Read current user
 
   useEffect(() => {
     const fetchTrip = async () => {
@@ -141,27 +142,8 @@ const Dashboard: React.FC = () => {
     },
   };
 
-  const handleScoreChange = (
-    teamIndex: number,
-    playerIndex: number,
-    roundIndex: number,
-    value: string
-  ) => {
-    const updatedScores = [...editScores];
-    updatedScores[teamIndex][playerIndex][roundIndex] = value;
-    setEditScores(updatedScores);
-  };
-
-  const handleSaveScores = () => {
-    const updatedTeams = config.teams.map((team, teamIndex) => ({
-      ...team,
-      players: team.players.map((player, playerIndex) => ({
-        ...player,
-        scores: editScores[teamIndex][playerIndex].map((s) => parseInt(s) || 0),
-      })),
-    }));
-    setConfig({ ...config, teams: updatedTeams });
-    setIsEditing(false);
+  const handleSetLineup = () => {
+    navigate(`/set-lineup/${tripId}`);
   };
 
   return (
@@ -199,23 +181,7 @@ const Dashboard: React.FC = () => {
                         <td className="px-4 py-2 border font-medium">{player.name}</td>
                         {player.scores.map((score, roundIndex) => (
                           <td key={roundIndex} className="px-4 py-2 border">
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                value={editScores[teamIndex][playerIndex][roundIndex]}
-                                onChange={(e) =>
-                                  handleScoreChange(
-                                    teamIndex,
-                                    playerIndex,
-                                    roundIndex,
-                                    e.target.value
-                                  )
-                                }
-                                className="w-16 px-2 py-1 border border-gray-300 rounded-md text-center"
-                              />
-                            ) : (
-                              score
-                            )}
+                            {score}
                           </td>
                         ))}
                       </tr>
@@ -226,23 +192,17 @@ const Dashboard: React.FC = () => {
             </div>
           ))}
 
-          <div className="flex flex-wrap gap-4 mt-6">
-            {isEditing ? (
+          {/* ✅ Conditionally show "Set Lineup" if you're the trip leader */}
+          {currentUsername === config.tripLeader && (
+            <div className="flex flex-wrap gap-4 mt-6">
               <button
-                onClick={handleSaveScores}
-                className="bg-[#0f172a] text-white px-5 py-2 rounded-md hover:bg-[#1e293b] transition"
+                onClick={handleSetLineup}
+                className="bg-[#34d399] hover:bg-[#10b981] text-white font-semibold px-5 py-2 rounded-md shadow transition"
               >
-                Save Scores
+                Set Lineup
               </button>
-            ) : (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="bg-[#facc15] hover:bg-[#eab308] text-[#0f172a] font-semibold px-5 py-2 rounded-md shadow transition"
-              >
-                Edit Scores
-              </button>
-            )}
-          </div>
+            </div>
+          )}
         </section>
       </main>
       <Footer />

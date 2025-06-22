@@ -30,7 +30,7 @@ const Header: React.FC<HeaderProps> = ({ showNav = true }) => {
           <nav>
             <ul className="flex gap-6 text-sm md:text-base">
               <li>
-                <Link to="/" className="hover:underline">Home</Link>
+                <Link to="/profile" className="hover:underline">Profile</Link>
               </li>
               <li>
                 <Link to={`/dashboard/${tripId}`} className="hover:underline">Scoreboard</Link>
