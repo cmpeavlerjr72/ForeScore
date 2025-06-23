@@ -185,7 +185,7 @@ const Profile: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#fdfdfb] flex flex-col">
-      <Header title="ForeScore Profile" showNav={true} />
+      <Header title="ForeScore Profile" showNav={false} />
       <main className="flex-grow container mx-auto px-4 py-8 flex">
         <aside className="w-1/3 p-4 border-r border-gray-300">
           <h2 className="text-xl font-semibold mb-2">Welcome</h2>

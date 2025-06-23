@@ -7,9 +7,33 @@ import { EventConfig } from '../App';
 
 const SOCKET_URL = 'https://forescore-db.onrender.com';
 
+// Generate a consistent color for each team based on index
+const getTeamColor = (index: number) => {
+  const colors = [
+    '#60A5FA', '#F87171', '#34D399', '#FBBF24', '#A78BFA',
+    '#F472B6', '#6EE7B7', '#FDE047', '#C4B5FD', '#FB923C',
+  ];
+  return colors[index % colors.length];
+};
+
+// Extend EventConfig to include team colors
+interface TeamWithColor {
+  name: string;
+  players: {
+    name: string;
+    scores: number[];
+    lineupOrder: number[];
+  }[];
+  color?: string; // Optional color property
+}
+
+interface ExtendedEventConfig extends EventConfig {
+  teams: TeamWithColor[];
+}
+
 const RoundScoreboard: React.FC = () => {
   const { tripId } = useParams();
-  const [config, setConfig] = useState<EventConfig | null>(null);
+  const [config, setConfig] = useState<ExtendedEventConfig | null>(null);
   const [userScores, setUserScores] = useState<Record<string, number[]>>({});
   const [activeTab, setActiveTab] = useState<'individual' | 'team'>('individual');
 
@@ -21,8 +45,17 @@ const RoundScoreboard: React.FC = () => {
     if (!tripId) return;
     try {
       const response = await fetch(`${SOCKET_URL}/trips/${tripId}`);
-      const data = await response.json();
-      setConfig(data);
+      if (!response.ok) throw new Error('Failed to fetch trip');
+      const data = await response.json() as ExtendedEventConfig; // Type assertion
+      // Assign colors to teams if not already present
+      const updatedConfig: ExtendedEventConfig = {
+        ...data,
+        teams: data.teams.map((team: TeamWithColor, index: number) => ({
+          ...team,
+          color: team.color || getTeamColor(index),
+        })),
+      };
+      setConfig(updatedConfig);
 
       const usernames = data.users || [];
       const allScores: Record<string, number[]> = {};
@@ -59,7 +92,7 @@ const RoundScoreboard: React.FC = () => {
     let p2_holes = 0;
     for (let i = 0; i < 18; i++) {
       if (s1[i] > 0 && s2[i] > 0) {
-        if (s1[i] < s2[i]) p1_holes++;
+        if (s1[i] < s2[i]) p1_holes++; // Lower score wins
         else if (s2[i] < s1[i]) p2_holes++;
       }
     }
@@ -68,19 +101,26 @@ const RoundScoreboard: React.FC = () => {
     return 0;
   };
 
-  const calculateMatchStatus = (s1: number[], s2: number[], hole: number) => {
+  const calculateMatchStatus = (s1: number[], s2: number[], hole: number, p1Name: string, p2Name: string) => {
     let p1 = 0, p2 = 0;
+    console.log(`Comparing ${p1Name} (s1: ${s1}) vs ${p2Name} (s2: ${s2}) up to hole ${hole}`); // Debug log
     for (let i = 0; i <= hole && i < 18; i++) {
       if (s1[i] > 0 && s2[i] > 0) {
-        if (s1[i] < s2[i]) p1++;
+        console.log(`Hole ${i}: ${p1Name}[${i}]=${s1[i]}, ${p2Name}[${i}]=${s2[i]}`); // Debug log
+        if (s1[i] < s2[i]) p1++; // Lower score wins
         else if (s2[i] < s1[i]) p2++;
       }
     }
+    console.log(`p1: ${p1}, p2: ${p2}`); // Debug log
     if (p1 === p2) return { status: "AS", color: 'bg-gray-400' };
     const diff = p1 - p2;
+    const team1 = config?.teams.find(t => t.players.some(p => p.name === p1Name));
+    const team2 = config?.teams.find(t => t.players.some(p => p.name === p2Name));
+    const team1Color = team1?.color || '#60A5FA';
+    const team2Color = team2?.color || '#F87171';
     return diff > 0
-      ? { status: diff.toString(), color: 'bg-[#60A5FA]' } // Team 1 color
-      : { status: Math.abs(diff).toString(), color: 'bg-[#F87171]' }; // Team 2 color
+      ? { status: diff.toString(), color: `bg-[${team1Color}]` }
+      : { status: Math.abs(diff).toString(), color: `bg-[${team2Color}]` };
   };
 
   if (!config) return null;
@@ -145,6 +185,7 @@ const RoundScoreboard: React.FC = () => {
 
                     {/* Stroke vs Match View */}
                     {scoringMethod === 'stroke' ? (
+                      // [Stroke play logic remains unchanged]
                       <>
                         <div className="flex gap-4 mb-4">
                           <button
@@ -192,7 +233,7 @@ const RoundScoreboard: React.FC = () => {
                                 .map((entry, idx) => (
                                   <tr key={idx} className="border-t">
                                     <td className="p-2 border">{entry.name}</td>
-                                    <td className="p-2 border">{entry.team}</td>
+                                    <td className="p-2 border" style={{ color: config.teams.find(t => t.name === entry.team)?.color }}>{entry.team}</td>
                                     <td className="p-2 border">{entry.scoreToPar >= 0 ? `+${entry.scoreToPar}` : entry.scoreToPar}</td>
                                     <td className="p-2 border">{entry.thru}</td>
                                   </tr>
@@ -222,7 +263,7 @@ const RoundScoreboard: React.FC = () => {
                                 });
                                 return (
                                   <tr key={teamIndex} className="border-t">
-                                    <td className="p-2 border">{team.name}</td>
+                                    <td className="p-2 border" style={{ color: team.color }}>{team.name}</td>
                                     <td className="p-2 border">{teamScore >= 0 ? `+${teamScore}` : teamScore}</td>
                                     <td className="p-2 border">
                                       {topPerformer.name} ({topPerformer.scoreToPar >= 0 ? `+${topPerformer.scoreToPar}` : topPerformer.scoreToPar})
@@ -236,57 +277,66 @@ const RoundScoreboard: React.FC = () => {
                       </>
                     ) : (
                       <div className="space-y-8">
-                        {config.teams[0].players.map((player1, i) => {
-                          const player2 = config.teams[1].players.find(
-                            (p) => p.lineupOrder[roundIndex] === player1.lineupOrder[roundIndex]
-                          );
-                          if (!player2) return null;
-
-                          const net1 = userScores[player1.name] || Array(18).fill(0);
-                          const net2 = userScores[player2.name] || Array(18).fill(0);
+                        {[...new Set(config.teams.flatMap(t => t.players.map(p => p.lineupOrder[roundIndex])))].map((_, groupIndex) => {
+                          const group = config.teams.flatMap(t => t.players.filter(p => p.lineupOrder[roundIndex] === groupIndex));
+                          if (group.length < 2) return null;
 
                           return (
-                            <div key={i} className="bg-gray-100 p-4 rounded-lg shadow-inner border border-gray-300">
+                            <div key={groupIndex} className="bg-gray-100 p-4 rounded-lg shadow-inner border border-gray-300">
                               <h4 className="text-md font-semibold mb-3 text-[#0f172a]">
-                                Match: {player1.name} (Team 1) vs {player2.name} (Team 2)
+                                Group {groupIndex + 1}: {group.map(p => p.name).join(', ')}
                               </h4>
                               <div className="overflow-x-auto">
                                 <table className="min-w-full text-sm text-center">
                                   <thead>
-                                    <tr className="bg-white">
-                                      <th className="border p-2 font-medium text-left">{player1.name}</th>
-                                      {Array.from({ length: 18 }, (_, i) => (
-                                        <td key={`p1-${i}`} className="border p-2 bg-white">
-                                          {net1[i] > 0 ? net1[i] : '–'}
-                                        </td>
-                                      ))}
-                                    </tr>
-                                    <tr className="bg-white">
-                                      <th className="border p-2 font-medium text-left">{player2.name}</th>
-                                      {Array.from({ length: 18 }, (_, i) => (
-                                        <td key={`p2-${i}`} className="border p-2 bg-white">
-                                          {net2[i] > 0 ? net2[i] : '–'}
-                                        </td>
-                                      ))}
-                                    </tr>
+                                    {group.map((player, pIdx) => {
+                                      const team = config.teams.find(t => t.players.some(p => p.name === player.name));
+                                      return (
+                                        <tr key={`header-${pIdx}`} className="bg-white" style={{ backgroundColor: team?.color || '#FFFFFF' }}>
+                                          <th className="border p-2 font-medium text-left">{player.name}</th>
+                                          {Array.from({ length: 18 }, (_, i) => (
+                                            <td key={`p${pIdx}-${i}`} className="border p-2 bg-white">
+                                              {userScores[player.name]?.[i] > 0 ? userScores[player.name][i] : '–'}
+                                            </td>
+                                          ))}
+                                        </tr>
+                                      );
+                                    })}
                                     <tr className="bg-white">
                                       <th className="border p-2 font-medium text-left">Match Status</th>
-                                      {Array.from({ length: 18 }, (_, i) => {
-                                        const { status, color } = calculateMatchStatus(net1, net2, i);
-                                        return (
-                                          <td key={`status-${i}`} className={`border p-2 ${color}`}>
-                                            {status}
-                                          </td>
-                                        );
-                                      })}
+                                      {Array.from({ length: 18 }, (_, i) => (
+                                        <td key={`status-${i}`} className="border p-2">
+                                          {group.map((p1, idx1) =>
+                                            group.slice(idx1 + 1).map((p2) => {
+                                              const net1 = userScores[p1.name] || Array(18).fill(0);
+                                              const net2 = userScores[p2.name] || Array(18).fill(0);
+                                              const { status, color } = calculateMatchStatus(net1, net2, i, p1.name, p2.name);
+                                              return (
+                                                <span key={`${p1.name}-vs-${p2.name}-${i}`} className={`inline-block w-12 ${color}`}>
+                                                  {status}
+                                                </span>
+                                              );
+                                            })
+                                          )}
+                                        </td>
+                                      ))}
                                     </tr>
                                   </thead>
                                 </table>
                               </div>
                               <div className="mt-3 text-gray-800">
-                                <p>
-                                  <strong>Team 1 Points Earned:</strong> {calculateMatchPoints(net1, net2)}
-                                </p>
+                                {group.map((p1, idx1) =>
+                                  group.slice(idx1 + 1).map((p2) => {
+                                    const net1 = userScores[p1.name] || Array(18).fill(0);
+                                    const net2 = userScores[p2.name] || Array(18).fill(0);
+                                    const points = calculateMatchPoints(net1, net2);
+                                    return (
+                                      <p key={`${p1.name}-vs-${p2.name}`}>
+                                        <strong>{p1.name} vs {p2.name} Points:</strong> {points} for {points === 1 ? p1.name : points === 0 ? p2.name : 'tie'}
+                                      </p>
+                                    );
+                                  })
+                                )}
                               </div>
                             </div>
                           );
@@ -296,7 +346,7 @@ const RoundScoreboard: React.FC = () => {
                   </>
                 )}
               </div>
-            );
+            )
           })}
         </div>
       </main>

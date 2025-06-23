@@ -27,10 +27,34 @@ ChartJS.register(
 
 const SOCKET_URL = 'https://forescore-db.onrender.com';
 
+// Generate a consistent color for each team based on index
+const getTeamColor = (index: number) => {
+  const colors = [
+    '#60A5FA', '#F87171', '#34D399', '#FBBF24', '#A78BFA',
+    '#F472B6', '#6EE7B7', '#FDE047', '#C4B5FD', '#FB923C',
+  ];
+  return colors[index % colors.length];
+};
+
+// Extend EventConfig to include team colors
+interface TeamWithColor {
+  name: string;
+  players: {
+    name: string;
+    scores: number[];
+    lineupOrder: number[];
+  }[];
+  color?: string; // Optional color property
+}
+
+interface ExtendedEventConfig extends EventConfig {
+  teams: TeamWithColor[];
+}
+
 const Dashboard: React.FC = () => {
   const { tripId } = useParams();
   const navigate = useNavigate();
-  const [config, setConfig] = useState<EventConfig | null>(null);
+  const [config, setConfig] = useState<ExtendedEventConfig | null>(null);
   const [editScores, setEditScores] = useState<string[][][]>([]);
   const currentUsername = localStorage.getItem('username') || ''; // ✅ Read current user
 
@@ -40,12 +64,20 @@ const Dashboard: React.FC = () => {
       try {
         const res = await fetch(`${SOCKET_URL}/trips/${tripId}`);
         if (!res.ok) throw new Error('Failed to fetch trip');
-        const data = await res.json();
-        setConfig(data);
+        const data = await res.json() as ExtendedEventConfig; // Type assertion
+        // Assign colors to teams if not already present
+        const updatedConfig: ExtendedEventConfig = {
+          ...data,
+          teams: data.teams.map((team: TeamWithColor, index: number) => ({
+            ...team,
+            color: team.color || getTeamColor(index),
+          })),
+        };
+        setConfig(updatedConfig);
         setEditScores(
-          data.teams.map((team: any) =>
-            team.players.map((player: any) =>
-              player.scores.map((score: number) => score.toString())
+          updatedConfig.teams.map((team) =>
+            team.players.map((player) =>
+              player.scores.map((score) => (score !== undefined ? score.toString() : '0'))
             )
           )
         );
@@ -66,44 +98,41 @@ const Dashboard: React.FC = () => {
   }
 
   const calculateTotalScores = () => {
-    return config.teams.map((team, teamIndex) => {
+    return config.teams.map((team) => {
       let totalTeamScore = 0;
       team.players.forEach((player) => {
+        if (!player.scores || !player.lineupOrder || player.scores.length !== config.numRounds) return;
         player.scores.forEach((score, roundIndex) => {
-          const opponentTeamIndex = teamIndex === 0 ? 1 : 0;
-          const opponentPlayerIndex =
-            config.teams[opponentTeamIndex].players.findIndex(
-              (oppPlayer) =>
-                oppPlayer.lineupOrder[roundIndex] ===
-                player.lineupOrder[roundIndex]
-            );
-          const opponentScore =
-            config.teams[opponentTeamIndex].players[opponentPlayerIndex]
-              ?.scores[roundIndex] || 0;
           const scoringMethod = config.scoringMethods[roundIndex];
-
           if (scoringMethod === 'match') {
-            if (score > opponentScore) totalTeamScore += 1;
-            else if (score === opponentScore) totalTeamScore += 0.5;
+            const group = config.teams
+              .flatMap(t => t.players.filter(p => p.lineupOrder?.[roundIndex] === player.lineupOrder[roundIndex]))
+              .filter(p => p.scores?.[roundIndex] !== undefined && p.name !== player.name);
+            if (group.length === 0) return; // No valid opponents
+            group.forEach((opponent) => {
+              const opponentScore = opponent.scores[roundIndex] || 0;
+              if (score > opponentScore) totalTeamScore += 1 / group.length; // Equal point share per win
+              else if (score === opponentScore) totalTeamScore += 0.5 / group.length; // Equal tie share
+            });
           } else if (scoringMethod === 'stroke') {
-            totalTeamScore += score;
+            totalTeamScore += score || 0;
           }
         });
       });
-      return totalTeamScore;
+      return Math.round(totalTeamScore * 10) / 10; // Round to 1 decimal place
     });
   };
 
   const totalScores = calculateTotalScores();
 
   const chartData = {
-    labels: config.teams.map((team) => team.name),
+    labels: config.teams.map((team) => team.name || `Team ${config.teams.indexOf(team) + 1}`), // Fallback label
     datasets: [
       {
         label: 'Total Score',
         data: totalScores,
-        backgroundColor: ['#60A5FA', '#F87171'],
-        borderColor: ['#2563EB', '#DC2626'],
+        backgroundColor: config.teams.map((team) => team.color || '#CCCCCC'), // Fallback color
+        borderColor: config.teams.map((team) => (team.color?.replace(/../, '#') || '#999999')), // Darken border with fallback
         borderWidth: 1,
       },
     ],
@@ -137,7 +166,7 @@ const Dashboard: React.FC = () => {
       datalabels: {
         anchor: 'end',
         align: 'end',
-        formatter: (value: number) => value.toString(),
+        formatter: (value: number) => (value !== undefined ? value.toString() : '0'),
       },
     },
   };
@@ -159,9 +188,9 @@ const Dashboard: React.FC = () => {
 
         <section className="bg-white rounded-lg shadow-md p-6">
           {config.teams.map((team, teamIndex) => (
-            <div key={teamIndex} className="mb-8">
-              <h3 className="text-lg font-semibold text-[#0f172a] mb-4">
-                {team.name}
+            <div key={teamIndex} className="mb-8" style={{ borderLeft: `4px solid ${team.color || '#CCCCCC'}` }}>
+              <h3 className="text-lg font-semibold text-[#0f172a] mb-4" style={{ color: team.color || '#000000' }}>
+                {team.name || `Team ${teamIndex + 1}`}
               </h3>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm border border-gray-200">
@@ -178,10 +207,10 @@ const Dashboard: React.FC = () => {
                   <tbody>
                     {team.players.map((player, playerIndex) => (
                       <tr key={playerIndex} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 border font-medium">{player.name}</td>
-                        {player.scores.map((score, roundIndex) => (
+                        <td className="px-4 py-2 border font-medium">{player.name || `Player ${playerIndex + 1}`}</td>
+                        {Array.from({ length: config.numRounds }, (_, roundIndex) => (
                           <td key={roundIndex} className="px-4 py-2 border">
-                            {score}
+                            {player.scores[roundIndex] !== undefined ? player.scores[roundIndex] : 'N/A'}
                           </td>
                         ))}
                       </tr>
