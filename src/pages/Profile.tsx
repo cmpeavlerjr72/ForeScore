@@ -23,6 +23,7 @@ const Profile: React.FC = () => {
   const [newTripId, setNewTripId] = useState('');
   const [tempConfig, setTempConfig] = useState<EventConfig>(defaultEventConfig);
   const [showSetupModal, setShowSetupModal] = useState(false);
+  const [inputNumRounds, setInputNumRounds] = useState(defaultEventConfig.numRounds.toString()); // Local input state
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -87,9 +88,9 @@ const Profile: React.FC = () => {
       tripId: newId,
       tripLeader: storedUsername,
       users: []
-
     });
     setShowSetupModal(true);
+    setInputNumRounds(defaultEventConfig.numRounds.toString()); // Reset input
   };
 
   const handleSetupConfigChange = (
@@ -132,7 +133,10 @@ const Profile: React.FC = () => {
   };
 
   const handleNumRoundsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newNumRounds = parseInt(e.target.value);
+    const value = e.target.value;
+    setInputNumRounds(value); // Update local input state immediately
+    const newNumRounds = parseInt(value) || 1; // Default to 1 if invalid
+    if (newNumRounds < 1) return; // Prevent negative or zero rounds
     setTempConfig((prev) => {
       const newCourses = Array(newNumRounds).fill('True Blue');
       const newScoringMethods = Array(newNumRounds).fill('match');
@@ -248,10 +252,10 @@ const Profile: React.FC = () => {
         </section>
       </main>
 
-      {/* Trip Setup Modal (unchanged) */}
+      {/* Trip Setup Modal (updated with scrolling) */}
       {showSetupModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md overflow-y-auto" style={{ maxHeight: '80vh' }}>
             <h3 className="text-lg font-semibold mb-4">Set Up New Trip</h3>
             <form onSubmit={handleSetupSubmit} className="grid gap-4 text-left">
               <p className="text-sm text-gray-600">Trip ID: {tempConfig.tripId}</p>
@@ -281,8 +285,7 @@ const Profile: React.FC = () => {
                 Number of Rounds
                 <input
                   type="number"
-                  name="numRounds"
-                  value={tempConfig.numRounds}
+                  value={inputNumRounds} // Use local state for input
                   onChange={handleNumRoundsChange}
                   min="1"
                   className="w-full border p-2 rounded"
