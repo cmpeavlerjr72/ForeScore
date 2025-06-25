@@ -64,19 +64,29 @@ const Profile: React.FC = () => {
   };
 
   const handleAddTrip = async () => {
-    if (!user || !newTripId) return;
+    if (!user || !newTripId.trim()) {
+      setError('Please enter a valid Trip ID');
+      return;
+    }
     try {
+      console.log(`Adding trip ${newTripId} for user ${user.username}`);
       const res = await fetch(`${SOCKET_URL}/users/${user.username}/add-trip`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tripId: newTripId }),
       });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Failed to add trip: ${res.status} - ${errorText}`);
+      }
       const updatedUser = await res.json();
+      console.log('API Response:', updatedUser);
       setUser(updatedUser);
       setNewTripId('');
       setError('');
-    } catch {
-      setError('Failed to add trip');
+    } catch (err: any) {
+      console.error('Add trip error:', err.message);
+      setError(`Failed to add trip: ${err.message}`);
     }
   };
 
@@ -252,7 +262,7 @@ const Profile: React.FC = () => {
         </section>
       </main>
 
-      {/* Trip Setup Modal (updated with scrolling) */}
+      {/* Trip Setup Modal (unchanged) */}
       {showSetupModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md overflow-y-auto" style={{ maxHeight: '80vh' }}>
