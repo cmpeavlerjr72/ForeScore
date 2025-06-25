@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ForeScoreLogo from '../assets/ForeScore.png';
+import { useLoading } from '../LoadingContext';
 
 const SOCKET_URL = 'https://forescore-db.onrender.com';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const { setIsLoading } = useLoading(); // Access setIsLoading from context
 
   // Login state
   const [loginUsername, setLoginUsername] = useState('');
@@ -24,55 +26,90 @@ const HomePage: React.FC = () => {
 
   const [error, setError] = useState('');
 
+  const withTimeout = (promise: Promise<Response>, ms: number): Promise<Response> => {
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Request timed out')), ms)
+    );
+    return Promise.race([promise, timeout]) as Promise<Response>;
+  };
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true); // Start loading
     try {
-      const response = await fetch(`${SOCKET_URL}/users/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: loginUsername, password: loginPassword }),
-      });
+      const maxRetries = 3;
+      const retryDelay = 20000; // 20 seconds between retries
 
-      if (!response.ok) throw new Error('Invalid login');
-
-      const data = await response.json();
-      console.log('Login success:', data);
-      // ✅ Store username in localStorage for use in Profile.tsx
-      localStorage.setItem('username', loginUsername);
-      
-      navigate('/profile');
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const response: Response = await withTimeout(
+            fetch(`${SOCKET_URL}/users/login`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: loginUsername, password: loginPassword }),
+            }),
+            10000 // 10-second timeout per attempt
+          );
+          if (!response.ok) throw new Error('Invalid login');
+          const data = await response.json();
+          console.log('Login success:', data);
+          localStorage.setItem('username', loginUsername);
+          navigate('/profile');
+          break; // Exit loop on success
+        } catch (err: any) {
+          console.error(`Login attempt ${attempt} failed:`, err.message);
+          if (attempt === maxRetries) throw err;
+          await new Promise(resolve => setTimeout(resolve, retryDelay)); // Wait before retry
+        }
+      }
     } catch (err: any) {
-      console.error('Login failed:', err.message);
-      setError('Login failed. Please check credentials.');
+      console.error('Login error:', err.message);
+      setError('Login failed. Please check credentials or try again later.');
+    } finally {
+      setIsLoading(false); // Stop loading
     }
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true); // Start loading
     try {
-      const response = await fetch(`${SOCKET_URL}/users/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: registerUsername,
-          password: registerPassword,
-          name: registerName,
-          handicap: parseFloat(registerHandicap),
-        }),
-      });
+      const maxRetries = 3;
+      const retryDelay = 20000; // 20 seconds between retries
 
-      if (!response.ok) throw new Error('Registration failed');
-
-      const data = await response.json();
-      console.log('Registration success:', data);
-      
-      localStorage.setItem('username',registerUsername)
-
-      setShowRegisterModal(false);
-      navigate('/profile');
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const response: Response = await withTimeout(
+            fetch(`${SOCKET_URL}/users/register`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                username: registerUsername,
+                password: registerPassword,
+                name: registerName,
+                handicap: parseFloat(registerHandicap),
+              }),
+            }),
+            10000 // 10-second timeout per attempt
+          );
+          if (!response.ok) throw new Error('Registration failed');
+          const data = await response.json();
+          console.log('Registration success:', data);
+          localStorage.setItem('username', registerUsername);
+          setShowRegisterModal(false);
+          navigate('/profile');
+          break; // Exit loop on success
+        } catch (err: any) {
+          console.error(`Registration attempt ${attempt} failed:`, err.message);
+          if (attempt === maxRetries) throw err;
+          await new Promise(resolve => setTimeout(resolve, retryDelay)); // Wait before retry
+        }
+      }
     } catch (err: any) {
-      console.error('Registration failed:', err.message);
-      setError('Registration failed. Please try again.');
+      console.error('Registration error:', err.message);
+      setError('Registration failed. Please try again later.');
+    } finally {
+      setIsLoading(false); // Stop loading
     }
   };
 

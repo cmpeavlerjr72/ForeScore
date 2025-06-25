@@ -6,6 +6,8 @@ import RoundScoreboard from './pages/RoundScoreboard';
 import Profile from './pages/Profile';
 import PlayerScoreEntry from './pages/PlayerScoreEntry';
 import SetLineup from './pages/SetLineup';
+import { LoadingProvider } from './LoadingContext';
+import LoadingOverlay from './LoadingOverlay';
 
 export interface EventConfig {
   tripId: string;
@@ -43,7 +45,6 @@ export const defaultEventConfig: EventConfig = {
   users: []
 };
 
-
 const App: React.FC = () => {
   const [config, setConfig] = useState<EventConfig>({
     tripId: '',
@@ -51,22 +52,25 @@ const App: React.FC = () => {
     playersPerTeam: 4,
     numRounds: 3,
     scoringMethods: ['match', 'match', 'match'],
-    courses: ['True Blue', 'True Blue', 'True Blue'], // Default courses
+    courses: ['True Blue', 'True Blue', 'True Blue'],
     teams: [],
   });
-  const [showDashboard, setShowDashboard] = useState(false); // Add state for dashboard visibility
+  const [showDashboard, setShowDashboard] = useState(false);
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<HomePage/>} />
-        <Route path="/dashboard/:tripId" element={<Dashboard />} />
-        <Route path="/round-scoreboard/:tripId" element={<RoundScoreboard />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/enter-scores/:tripId" element={<PlayerScoreEntry />} />
-        <Route path="/set-lineup/:tripId" element={<SetLineup />} />
-      </Routes>
-    </Router>
+    <LoadingProvider>
+      <LoadingOverlay />
+      <Router>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/dashboard/:tripId" element={<Dashboard />} />
+          <Route path="/round-scoreboard/:tripId" element={<RoundScoreboard />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/enter-scores/:tripId" element={<PlayerScoreEntry />} />
+          <Route path="/set-lineup/:tripId" element={<SetLineup />} />
+        </Routes>
+      </Router>
+    </LoadingProvider>
   );
 };
 
