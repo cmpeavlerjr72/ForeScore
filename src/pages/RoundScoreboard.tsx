@@ -44,6 +44,59 @@ const RoundScoreboard: React.FC = () => {
     fetchTrip();
   }, [tripId]);
 
+  const computeAndSaveProjectedPoints = async (configData: ExtendedEventConfig, scores: Record<string, Record<number, { net: number[] }>>) => {
+    if (!tripId) return;
+  
+    for (let round = 0; round < configData.numRounds; round++) {
+      const scoringMethod = configData.scoringMethods[round];
+      if (scoringMethod !== 'match') continue;
+  
+      const totals: Record<string, number> = {};
+  
+      for (let groupIndex = 0; groupIndex < configData.playersPerTeam; groupIndex++) {
+        const group = configData.teams.map((team, teamIndex) => {
+          const playerIndex = (groupIndex + teamIndex) % team.players.length;
+          const player = team.players[playerIndex] || { name: `Player ${playerIndex + 1}`, scores: [], lineupOrder: [] };
+          return { ...player, teamName: team.name, teamColor: team.color };
+        });
+  
+        for (let i = 0; i < group.length; i++) {
+          for (let j = i + 1; j < group.length; j++) {
+            const p1 = group[i];
+            const p2 = group[j];
+            const net1 = scores[p1.name]?.[round]?.net || Array(18).fill(0);
+            const net2 = scores[p2.name]?.[round]?.net || Array(18).fill(0);
+  
+            let currentHole = -1;
+            for (let k = 0; k < 18; k++) {
+              if (net1[k] > 0 && net2[k] > 0) currentHole = k;
+              else break;
+            }
+  
+            const { points, leader } = calculateProjectedPoints(p1.name, p2.name, currentHole);
+  
+            if (leader === p1.name) totals[p1.name] = (totals[p1.name] || 0) + points;
+            else if (leader === p2.name) totals[p2.name] = (totals[p2.name] || 0) + points;
+            else {
+              totals[p1.name] = (totals[p1.name] || 0) + 0.5;
+              totals[p2.name] = (totals[p2.name] || 0) + 0.5;
+            }
+          }
+        }
+      }
+  
+      for (const [username, points] of Object.entries(totals)) {
+        await fetch(`${SOCKET_URL}/users/${username}/trips/${tripId}/save-projected-points`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ round, projectedPoints: points }),
+        });
+      }
+    }
+  };
+  
+  
+
   const fetchTrip = async () => {
     if (!tripId) return;
     try {
@@ -73,6 +126,10 @@ const RoundScoreboard: React.FC = () => {
         }
       }
       setUserScores(allScores);
+
+      // ✅ Automatically save projected points after scores are loaded
+      await computeAndSaveProjectedPoints(updatedConfig, allScores);
+
     } catch (err) {
       console.error('Failed to load trip or scores:', err);
     }
@@ -109,6 +166,22 @@ const RoundScoreboard: React.FC = () => {
     return 0;
   };
 
+
+  const calculateProjectedPoints = (playerName: string, opponentName: string, currentHole: number): { points: number, leader: string } => {
+    const net1 = userScores[playerName]?.[selectedRound]?.net || Array(18).fill(0);
+    const net2 = userScores[opponentName]?.[selectedRound]?.net || Array(18).fill(0);
+    const { status } = calculateMatchStatus(net1, net2, currentHole, playerName, opponentName);
+    let leader = 'tie';
+
+    if (status !== "AS") {
+      const { diff } = calculateMatchStatus(net1, net2, currentHole, playerName, opponentName); // Extract diff internally
+      leader = diff > 0 ? playerName : opponentName;
+    }
+
+    if (status === "AS") return { points: 0.5, leader };
+    return { points: status !== "0" ? 1 : 0, leader };
+  };
+
   const calculateMatchStatus = (s1: number[], s2: number[], hole: number, p1Name: string, p2Name: string) => {
     let p1 = 0, p2 = 0;
     for (let i = 0; i <= hole && i < 18; i++) {
@@ -117,15 +190,15 @@ const RoundScoreboard: React.FC = () => {
         else if (s2[i] < s1[i]) p2++;
       }
     }
-    if (p1 === p2) return { status: "AS", color: 'bg-gray-400' };
     const diff = p1 - p2;
+    if (p1 === p2) return { status: "AS", color: 'bg-gray-400', diff: 0 };
     const team1 = config?.teams.find(t => t.players.some(p => p.name === p1Name));
     const team2 = config?.teams.find(t => t.players.some(p => p.name === p2Name));
     const team1Color = team1?.color || '#60A5FA';
     const team2Color = team2?.color || '#F87171';
     return diff > 0
-      ? { status: diff.toString(), color: `bg-[${team1Color}]` }
-      : { status: Math.abs(diff).toString(), color: `bg-[${team2Color}]` };
+      ? { status: diff.toString(), color: `bg-[${team1Color}]`, diff }
+      : { status: Math.abs(diff).toString(), color: `bg-[${team2Color}]`, diff: diff };
   };
 
   if (!config) return <div>Loading...</div>;
@@ -434,11 +507,22 @@ const RoundScoreboard: React.FC = () => {
                             group.slice(idx1 + 1).map((p2) => {
                               const net1 = userScores[p1.name]?.[selectedRound]?.net || Array(18).fill(0);
                               const net2 = userScores[p2.name]?.[selectedRound]?.net || Array(18).fill(0);
-                              const points = calculateMatchPoints(net1, net2);
+                              let currentHole = -1;
+                              for (let i = 0; i < 18; i++) {
+                                if (net1[i] > 0 && net2[i] > 0) currentHole = i;
+                                else break;
+                              }
+                              const { points: projectedPoints, leader } = calculateProjectedPoints(p1.name, p2.name, currentHole);
+                              const finalPoints = calculateMatchPoints(net1, net2); // For completed matches
                               const matchKey = `${groupIndex}-${p1.name}-${p2.name}`;
                               return (
                                 <p key={matchKey}>
-                                  <strong>{p1.name} ({p1.teamName}) vs {p2.name} ({p2.teamName}) Points:</strong> {points} for {points === 1 ? p1.name : points === 0 ? p2.name : 'tie'}
+                                  <strong>{p1.name} ({p1.teamName}) vs {p2.name} ({p2.teamName})</strong>
+                                  {currentHole < 17 ? (
+                                    <span>: Projected Points: {projectedPoints} for {leader} thru {currentHole + 1}</span>
+                                  ) : (
+                                    <span>: Points: {finalPoints} for {finalPoints === 1 ? p1.name : finalPoints === 0 ? p2.name : 'tie'}</span>
+                                  )}
                                 </p>
                               );
                             })
