@@ -2,6 +2,9 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import dashboard from '../assets/dashboard.png';
+import matchplay from '../assets/Match Demo.png';
+import strokeplay from '../assets/Stroke_play.png';
 
 const Demo: React.FC = () => {
   return (
@@ -24,7 +27,7 @@ const Demo: React.FC = () => {
             {/* Screenshot 1 */}
             <div className="bg-gray-100 p-4 rounded-lg">
               <img
-                src="src\assets\dashboard.png"
+                src={dashboard}
                 alt="Dashboard Screenshot"
                 className="w-full h-auto rounded-lg"
               />
@@ -49,7 +52,7 @@ const Demo: React.FC = () => {
             {/* Screenshot 1 */}
             <div className="bg-gray-100 p-4 rounded-lg">
               <img
-                src="src\assets\Match Demo.png"
+                src={matchplay}
                 alt="Dashboard Screenshot"
                 className="w-full h-auto rounded-lg"
               />
@@ -59,7 +62,7 @@ const Demo: React.FC = () => {
             {/* Screenshot 2 */}
             <div className="bg-gray-100 p-4 rounded-lg">
               <img
-                src="src\assets\Stroke_play.png"
+                src={strokeplay}
                 alt="Score Entry Screenshot"
                 className="w-full h-auto rounded-lg"
               />
