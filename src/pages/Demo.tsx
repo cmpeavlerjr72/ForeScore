@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import dashboard from '../assets/dashboard.png';
-import matchplay from '../assets/Match Demo.png';
+import matchplay from '../assets/MatchDemo.png';
 import strokeplay from '../assets/Stroke_play.png';
 
 const Demo: React.FC = () => {
