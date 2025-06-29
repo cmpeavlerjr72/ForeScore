@@ -211,68 +211,75 @@ const PlayerScoreEntry: React.FC = () => {
           </div>
         )}
 
-        <div className="overflow-x-auto mb-4 rounded-lg bg-[#1e293b] shadow-sm p-4">
-          <table className="min-w-full text-center text-xs text-white">
-            <thead>
-              <tr className="uppercase tracking-wide text-gray-200">
-                <th className="p-2">HOLE</th>
-                {Array.from({ length: 18 }, (_, i) => (
-                  <th key={`hole-${i}`} className="p-2 border border-[#334155]">{i + 1}</th>
-                ))}
-              </tr>
-              <tr>
-                <td colSpan={18}>
-                  <div className="border-t-4 border-[#facc15] w-full my-1" />
-                </td>
-              </tr>
-              <tr>
-                <th className="p-2">Par</th>
-                {(courseData?.par || Array(18).fill(3)).map((par, i) => (
-                  <td key={`par-${i}`} className="p-2 border border-[#334155]">{par}</td>
-                ))}
-              </tr>
-              <tr>
-                <th className="p-2">HCP</th>
-                {(courseData?.handicap || Array(18).fill(1)).map((hcp, i) => (
-                  <td key={`hcp-${i}`} className="p-2 border border-[#334155]">{hcp}</td>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="bg-yellow-50 font-medium text-black">
-                <th className="p-2 border border-[#334155]">Your Score</th>
-                {Array.from({ length: 18 }, (_, i) => (
-                  <td key={`score-${i}`} className="p-2 border border-[#334155]">
-                    <input
-                      type="number"
-                      min={1}
-                      value={(scores[selectedRound] || Array(18).fill(0))[i].toString()}
-                      onChange={(e) => handleScoreChange(i, e.target.value)}
-                      className="w-14 text-center border rounded px-1 py-0.5 text-black"
-                    />
-                  </td>
-                ))}
-              </tr>
-              <tr className="bg-white font-medium text-blue-800">
-                <th className="p-2 border border-[#334155] bg-gray-100">NET Score</th>
-                {netScores.map((net, i) => (
-                  <td key={`net-${i}`} className="p-2 border border-[#334155]">
-                    {net || ''}
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-          <div className="mt-6 flex items-center justify-between">
-            <button
-              onClick={handleSubmit}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded shadow"
-            >
-              Submit Scores
-            </button>
-            {message && <p className="text-md font-medium text-white">{message}</p>}
-          </div>
-        </div>
+<div className="mb-4">
+  {[0, 9].map((start, sectionIndex) => (
+    <div key={sectionIndex} className="mb-8 rounded-lg bg-[#1e293b] shadow-sm p-4 overflow-x-auto">
+      <table className="min-w-full text-center text-xs text-white">
+        <thead>
+          <tr className="uppercase tracking-wide text-gray-200">
+            <th className="p-2">HOLE</th>
+            {Array.from({ length: 9 }, (_, i) => (
+              <th key={`hole-${start + i}`} className="p-2 border border-[#334155]">{start + i + 1}</th>
+            ))}
+          </tr>
+          <tr>
+            <td colSpan={10}>
+              <div className="border-t-4 border-[#facc15] w-full my-1" />
+            </td>
+          </tr>
+          <tr>
+            <th className="p-2">Par</th>
+            {(courseData?.par || Array(18).fill(3)).slice(start, start + 9).map((par, i) => (
+              <td key={`par-${start + i}`} className="p-2 border border-[#334155]">{par}</td>
+            ))}
+          </tr>
+          <tr>
+            <th className="p-2">HCP</th>
+            {(courseData?.handicap || Array(18).fill(1)).slice(start, start + 9).map((hcp, i) => (
+              <td key={`hcp-${start + i}`} className="p-2 border border-[#334155]">{hcp}</td>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="bg-yellow-50 font-medium text-black">
+            <th className="p-2 border border-[#334155]">Your Score</th>
+            {Array.from({ length: 9 }, (_, i) => (
+              <td key={`score-${start + i}`} className="p-2 border border-[#334155]">
+                <input
+                  type="number"
+                  min={1}
+                  value={(scores[selectedRound] || Array(18).fill(0))[start + i].toString()}
+                  onChange={(e) => handleScoreChange(start + i, e.target.value)}
+                  className="w-14 text-center border rounded px-1 py-0.5 text-black"
+                />
+              </td>
+            ))}
+          </tr>
+          <tr className="bg-white font-medium text-blue-800">
+            <th className="p-2 border border-[#334155] bg-gray-100">NET Score</th>
+            {netScores.slice(start, start + 9).map((net, i) => (
+              <td key={`net-${start + i}`} className="p-2 border border-[#334155]">
+                {net || ''}
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  ))}
+
+  <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between px-4">
+    <button
+      onClick={handleSubmit}
+      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded shadow mb-4 sm:mb-0"
+    >
+      Submit Scores
+    </button>
+    {message && <p className="text-md font-medium text-[#1e293b] sm:ml-4">{message}</p>}
+  </div>
+</div>
+
+
       </main>
       <Footer />
     </div>
