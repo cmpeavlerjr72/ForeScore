@@ -30,7 +30,7 @@ const SOCKET_URL = 'https://forescore-db.onrender.com';
 interface TeamWithColor {
   name: string;
   players: {
-    name: string;
+    name: string; // Keep username for backend
     scores: number[];
     lineupOrder: number[];
   }[];
@@ -56,6 +56,7 @@ const Dashboard: React.FC = () => {
   const [projectedPointsByUser, setProjectedPointsByUser] = useState<
     Record<string, number[]>
   >({});
+  const [nicknameMap, setNicknameMap] = useState<Record<string, string>>({});
   const currentUsername = localStorage.getItem('username') || '';
 
   useEffect(() => {
@@ -72,6 +73,16 @@ const Dashboard: React.FC = () => {
           })),
         };
         setConfig(updatedConfig);
+
+        // Fetch nicknames for all users
+        const usernames = updatedConfig.users || [];
+        const nicknames: Record<string, string> = {};
+        for (const username of usernames) {
+          const res = await fetch(`${SOCKET_URL}/users/${username}`);
+          const userData = await res.json();
+          nicknames[username] = userData.name || username; // Use 'name' as nickname, fallback to username
+        }
+        setNicknameMap(nicknames);
       } catch (err) {
         console.error('Error loading trip:', err);
       }
@@ -167,7 +178,7 @@ const Dashboard: React.FC = () => {
                 <tbody>
                   {team.players.map((player, playerIndex) => (
                     <tr key={playerIndex} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 border font-medium">{player.name}</td>
+                      <td className="px-4 py-2 border font-medium">{nicknameMap[player.name] || player.name}</td>
                       {Array.from({ length: config.numRounds }, (_, roundIndex) => (
                         <td key={roundIndex} className="px-4 py-2 border">
                           {projectedPointsByUser[player.name]?.[roundIndex]?.toFixed(1) || '0.0'}

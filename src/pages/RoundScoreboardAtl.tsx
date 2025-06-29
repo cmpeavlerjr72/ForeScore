@@ -31,6 +31,65 @@ interface ExtendedEventConfig extends EventConfig {
   teams: TeamWithColor[];
 }
 
+const LIV_POINTS: number[] = [
+  4.0, 3.0, 2.4, 1.8, 1.6, 1.4, 1.3, 1.2, 1.1, 1.0,
+  0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.3, 0.2, 0.2, 0.2,
+  0.1, 0.1, 0.1, 0.1
+];
+
+const computeStrokePlayProjectedPoints = (
+  config: ExtendedEventConfig,
+  scores: Record<string, Record<number, { net: number[] }>>,
+  round: number
+): Record<string, number> => {
+  const course = golfCourses.find(c => c.name === config.courses[round]);
+  if (!course) return {};
+
+  const playersWithScores = config.teams.flatMap(team =>
+    team.players.map(player => {
+      const net = scores[player.name]?.[round]?.net || Array(18).fill(0);
+      let scoreToPar = 0;
+      for (let i = 0; i < 18; i++) {
+        if (net[i] > 0) {
+          scoreToPar += net[i] - course.par[i];
+        }
+      }
+      return { name: player.name, scoreToPar };
+    })
+  );
+
+  playersWithScores.sort((a, b) => a.scoreToPar - b.scoreToPar);
+
+  const projectedPoints: Record<string, number> = {};
+  let rank = 0;
+
+  while (rank < playersWithScores.length) {
+    const tiedGroup = [playersWithScores[rank]];
+    let i = rank + 1;
+    while (
+      i < playersWithScores.length &&
+      playersWithScores[i].scoreToPar === playersWithScores[rank].scoreToPar
+    ) {
+      tiedGroup.push(playersWithScores[i]);
+      i++;
+    }
+
+    const totalPoints = tiedGroup.reduce((sum, _, idx) => {
+      const pos = rank + idx;
+      return sum + (LIV_POINTS[pos] || 0);
+    }, 0);
+
+    const avgPoints = totalPoints / tiedGroup.length;
+    tiedGroup.forEach(player => {
+      projectedPoints[player.name] = avgPoints;
+    });
+
+    rank += tiedGroup.length;
+  }
+
+  return projectedPoints;
+};
+
 const RoundScoreboard: React.FC = () => {
   const { tripId } = useParams();
   const [config, setConfig] = useState<ExtendedEventConfig | null>(null);
@@ -39,10 +98,108 @@ const RoundScoreboard: React.FC = () => {
   const [selectedRound, setSelectedRound] = useState<number>(0);
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
+  const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
+  const [nicknameMap, setNicknameMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchTrip();
   }, [tripId]);
+
+  useEffect(() => {
+    if (config && Object.keys(userScores).length > 0) {
+      computeAndSaveProjectedPoints(config, userScores);
+    }
+  }, [config, userScores]);
+  
+
+  const computeAndSaveProjectedPoints = async (
+    configData: ExtendedEventConfig,
+    scores: Record<string, Record<number, { net: number[] }>>
+  ) => {
+    if (!tripId) return;
+  
+    for (let round = 0; round < configData.numRounds; round++) {
+      const scoringMethod = configData.scoringMethods[round];
+  
+      if (scoringMethod === 'match') {
+        const totals: Record<string, number> = {};
+      
+        for (let groupIndex = 0; groupIndex < configData.playersPerTeam; groupIndex++) {
+          const group = configData.teams.map((team, teamIndex) => {
+            const playerIndex = (groupIndex + teamIndex) % team.players.length;
+            const player = team.players[playerIndex] || { name: `Player ${playerIndex + 1}`, scores: [], lineupOrder: [] };
+            return { ...player, teamName: team.name, teamColor: team.color };
+          });
+      
+          // ✅ Initialize group-level points object
+          const groupPoints: Record<string, number> = {};
+          group.forEach(player => {
+            groupPoints[player.name] = 0;
+          });
+      
+          // ✅ Run all matchups in group
+          for (let i = 0; i < group.length; i++) {
+            for (let j = i + 1; j < group.length; j++) {
+              const p1 = group[i];
+              const p2 = group[j];
+              const net1 = scores[p1.name]?.[round]?.net || Array(18).fill(0);
+              const net2 = scores[p2.name]?.[round]?.net || Array(18).fill(0);
+      
+              let currentHole = -1;
+              for (let k = 0; k < 18; k++) {
+                if (net1[k] > 0 && net2[k] > 0) currentHole = k;
+                else break;
+              }
+      
+              const { points, leader } = calculateProjectedPoints(p1.name, p2.name, currentHole, round);
+      
+              // ✅ Add to group points
+              if (leader === 'tie') {
+                groupPoints[p1.name] += 0.5;
+                groupPoints[p2.name] += 0.5;
+              } else {
+                groupPoints[p1.name] += leader === p1.name ? 1 : 0;
+                groupPoints[p2.name] += leader === p2.name ? 1 : 0;
+              }
+      
+              console.log(`🏌️‍♂️ Match: ${p1.name} vs ${p2.name}`);
+              console.log(`Holes completed: ${currentHole + 1}`);
+              console.log(`Projected leader: ${leader}`);
+              console.log(`Current group points: ${p1.name}=${groupPoints[p1.name]}, ${p2.name}=${groupPoints[p2.name]}`);
+            }
+          }
+      
+          // ✅ Add group results to totals
+          for (const [username, points] of Object.entries(groupPoints)) {
+            totals[username] = (totals[username] || 0) + points;
+          }
+        }
+      
+        // ✅ Save final totals
+        for (const [username, points] of Object.entries(totals)) {
+          console.log(`💾 Saving projected points for ${username} (Round ${round + 1}): ${points}`);
+          await fetch(`${SOCKET_URL}/users/${username}/trips/${tripId}/save-projected-points`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ round, projectedPoints: points }),
+          });
+        }
+  
+      } else if (scoringMethod === 'stroke') {
+        const strokePoints = computeStrokePlayProjectedPoints(configData, scores, round);
+        for (const [username, points] of Object.entries(strokePoints)) {
+          console.log(`💾 Saving stroke projected points for ${username} (Round ${round + 1}): ${points}`);
+          await fetch(`${SOCKET_URL}/users/${username}/trips/${tripId}/save-projected-points`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ round, projectedPoints: points }),
+          });
+        }
+      }
+    }
+  };
+  
+  
 
   const fetchTrip = async () => {
     if (!tripId) return;
@@ -60,7 +217,18 @@ const RoundScoreboard: React.FC = () => {
       setConfig(updatedConfig);
 
       const usernames = data.users || [];
+      const nicknames : Record <string, string> = {};
+
+    
+      for (const username of usernames) {
+        const res = await fetch(`${SOCKET_URL}/users/${username}`);
+        const userData = await res.json();
+        nicknames[username] = userData.name || username;
+      }
+      setNicknameMap(nicknames); 
+
       const allScores: Record<string, Record<number, { net: number[]; raw: number[] }>> = {};
+      
       for (const username of usernames) {
         allScores[username] = {};
         for (let round = 0; round < updatedConfig.numRounds; round++) {
@@ -73,6 +241,8 @@ const RoundScoreboard: React.FC = () => {
         }
       }
       setUserScores(allScores);
+
+
     } catch (err) {
       console.error('Failed to load trip or scores:', err);
     }
@@ -109,19 +279,49 @@ const RoundScoreboard: React.FC = () => {
     return 0;
   };
 
-  const calculateProjectedPoints = (playerName: string, opponentName: string, currentHole: number): { points: number, leader: string } => {
-    const net1 = userScores[playerName]?.[selectedRound]?.net || Array(18).fill(0);
-    const net2 = userScores[opponentName]?.[selectedRound]?.net || Array(18).fill(0);
-    const { status } = calculateMatchStatus(net1, net2, currentHole, playerName, opponentName);
-    let leader = 'tie';
+  const getMatchResultText = (s1: number[], s2: number[]) => {
+    let p1_holes = 0;
+    let p2_holes = 0;
+    let completed = 0;
+  
+    for (let i = 0; i < 18; i++) {
+      if (s1[i] > 0 && s2[i] > 0) {
+        completed++;
+        if (s1[i] < s2[i]) p1_holes++;
+        else if (s2[i] < s1[i]) p2_holes++;
+      }
+    }
+  
+    const remaining = 18 - completed;
+    const diff = Math.abs(p1_holes - p2_holes);
+  
+    if (p1_holes === p2_holes) return 'A/S';
+    if (diff > remaining) return `${diff}&${remaining}`;
+    return ''; // match still live
+  };
+  
 
+
+  const calculateProjectedPoints = (
+    playerName: string,
+    opponentName: string,
+    currentHole: number,
+    round: number
+  ): { points: number; leader: string } => {
+    const net1 = userScores[playerName]?.[round]?.net || Array(18).fill(0);
+    const net2 = userScores[opponentName]?.[round]?.net || Array(18).fill(0);
+    const { status } = calculateMatchStatus(net1, net2, currentHole, playerName, opponentName);
+  
+    let leader = 'tie';
     if (status !== "AS") {
-      const { diff } = calculateMatchStatus(net1, net2, currentHole, playerName, opponentName); // Extract diff internally
+      const { diff } = calculateMatchStatus(net1, net2, currentHole, playerName, opponentName);
       leader = diff > 0 ? playerName : opponentName;
     }
-
-    if (status === "AS") return { points: 0.5, leader };
-    return { points: status !== "0" ? 1 : 0, leader };
+  
+    return {
+      points: status === "AS" ? 0.5 : (status !== "0" ? 1 : 0),
+      leader
+    };
   };
 
   const calculateMatchStatus = (s1: number[], s2: number[], hole: number, p1Name: string, p2Name: string) => {
@@ -404,72 +604,117 @@ const RoundScoreboard: React.FC = () => {
                     if (group.length < 2) return null;
 
                     return (
-                      <div key={groupIndex} className="bg-gray-100 p-4 rounded-lg shadow-inner border border-gray-300">
-                        <h4 className="text-md font-semibold mb-3 text-[#0f172a]">
+                      <div key={groupIndex} className="bg-gray-100 p-4 rounded-lg border shadow-sm">
+                        <h4 className="text-md font-semibold mb-2 text-[#0f172a]">
                           Group {groupIndex + 1}: {group.map(p => p.name).join(', ')}
                         </h4>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full text-sm text-center">
-                            <thead>
-                              {group.map((player, pIdx) => (
-                                <tr key={`header-${groupIndex}-${pIdx}`} className="bg-white" style={{ backgroundColor: player.teamColor || '#FFFFFF' }}>
-                                  <th className="border p-2 font-medium text-left">{player.name} ({player.teamName})</th>
-                                  {Array.from({ length: 18 }, (_, i) => (
-                                    <td key={`p${pIdx}-${i}`} className="border p-2 bg-white">
-                                      {userScores[player.name]?.[selectedRound]?.net[i] > 0 ? userScores[player.name][selectedRound].net[i] : '–'}
-                                    </td>
-                                  ))}
-                                </tr>
-                              ))}
-                              <tr className="bg-white">
-                                <th className="border p-2 font-medium text-left">Match Status</th>
-                                {Array.from({ length: 18 }, (_, i) => (
-                                  <td key={`status-${groupIndex}-${i}`} className="border p-2">
-                                    {group.map((p1, idx1) =>
-                                      group.slice(idx1 + 1).map((p2) => {
-                                        const net1 = userScores[p1.name]?.[selectedRound]?.net || Array(18).fill(0);
-                                        const net2 = userScores[p2.name]?.[selectedRound]?.net || Array(18).fill(0);
-                                        const { status, color } = calculateMatchStatus(net1, net2, i, p1.name, p2.name);
-                                        const uniqueKey = `${groupIndex}-${p1.name}-${p2.name}-${i}`;
-                                        return (
-                                          <span key={uniqueKey} className={`inline-block w-12 ${color}`}>
-                                            {status}
-                                          </span>
-                                        );
-                                      })
+
+                        <table className="min-w-full text-sm mb-4">
+                          <tbody>
+                            <tr>
+                              <td className="p-2"></td>
+                              <td className="p-2"></td>
+                              <td className="p-2 text-center font-bold text-[#0f172a]">Thru</td>
+                              <td className="p-2"></td>
+                              <td className="p-2"></td>
+                            </tr>
+
+                            {group.map((p1, idx1) =>
+                              group.slice(idx1 + 1).map((p2) => {
+                                const net1 = userScores[p1.name]?.[selectedRound]?.net || Array(18).fill(0);
+                                const net2 = userScores[p2.name]?.[selectedRound]?.net || Array(18).fill(0);
+
+                                let currentHole = -1;
+                                for (let i = 0; i < 18; i++) {
+                                  if (net1[i] > 0 && net2[i] > 0) currentHole = i;
+                                  else break;
+                                }
+
+                                const { status: matchStatus, color: statusColor } = calculateMatchStatus(net1, net2, currentHole, p1.name, p2.name);
+                                const matchResult = calculateMatchStatus(net1, net2, currentHole, p1.name, p2.name);
+                                const isAllSquare = matchResult.status === 'AS';
+                                const leadingPlayer = matchResult.diff > 0 ? p1.name : matchResult.diff < 0 ? p2.name : null;
+                              
+                                const matchKey = `${groupIndex}-${p1.name}-${p2.name}`;
+                                const isExpanded = expandedMatch === matchKey;
+
+                                return (
+                                  <React.Fragment key={matchKey}>
+                                    <tr
+                                      className="cursor-pointer"
+                                      onClick={() => setExpandedMatch(isExpanded ? null : matchKey)}
+                                    >
+                                      <td className={`p-2 text-right font-semibold ${p1.name === leadingPlayer ? 'text-white' : ''} ${isAllSquare ? 'bg-gray-400 text-white' : ''}`}
+                                        style={{ backgroundColor: p1.name === leadingPlayer ? p1.teamColor : isAllSquare ? '#9ca3af' : '' }}>
+                                          {p1.name === leadingPlayer || isAllSquare ? matchResult.status : ''}
+                                        </td>
+                                      <td
+                                        className={`p-2 text-right font-semibold ${p1.name === leadingPlayer ? 'text-white' : ''} ${isAllSquare ? 'bg-gray-400 text-white' : ''}`}
+                                        style={{ backgroundColor: p1.name === leadingPlayer ? p1.teamColor : isAllSquare ? '#9ca3af' : '' }}
+                                      >
+                                        {p1.name}
+                                      </td>
+                                      <td className="p-2 bg-[#1e293b] text-white font-bold text-center">
+                                        {Math.min(net1.filter(n => n > 0).length, net2.filter(n => n > 0).length)}
+                                      </td>
+
+                                      <td
+                                        className={`p-2 text-left font-semibold ${p2.name === leadingPlayer ? 'text-white' : ''} ${isAllSquare ? 'bg-gray-400 text-white' : ''}`}
+                                        style={{ backgroundColor: p2.name === leadingPlayer ? p2.teamColor : isAllSquare ? '#9ca3af' : '' }}
+                                      >
+                                        {p2.name}
+                                      </td>
+                                      <td className={`p-2 text-left font-semibold ${p2.name === leadingPlayer ? 'text-white' : ''} ${isAllSquare ? 'bg-gray-400 text-white' : ''}`}
+                                        style={{ backgroundColor: p2.name === leadingPlayer ? p2.teamColor : isAllSquare ? '#9ca3af' : '' }}>
+                                          {p2.name === leadingPlayer || isAllSquare ? matchResult.status : ''}
+                                        </td>
+                                    </tr>
+
+                                    {isExpanded && (
+                                      <tr>
+                                        <td colSpan={4}>
+                                          <div className="overflow-x-auto mt-3">
+                                            <table className="min-w-full text-xs text-center border border-gray-300">
+                                              <thead className="bg-gray-200">
+                                                <tr>
+                                                  <th className="p-2 border">Hole</th>
+                                                  {Array.from({ length: 18 }, (_, i) => (
+                                                    <th key={i} className="p-2 border">{i + 1}</th>
+                                                  ))}
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {[p1, p2].map((player, idx) => (
+                                                  <tr key={player.name} className="bg-white">
+                                                    <td className="p-2 border font-medium">{player.name}</td>
+                                                    {userScores[player.name]?.[selectedRound]?.net.map((score, i) => (
+                                                      <td key={i} className="p-2 border">{score > 0 ? score : '–'}</td>
+                                                    ))}
+                                                  </tr>
+                                                ))}
+                                                <tr className="bg-gray-100">
+                                                  <td className="p-2 border font-medium">Status</td>
+                                                  {Array.from({ length: 18 }, (_, i) => {
+                                                    const { status, color } = calculateMatchStatus(net1, net2, i, p1.name, p2.name);
+                                                    return (
+                                                      <td key={i} className={`p-2 border ${color}`}>
+                                                        {status}
+                                                      </td>
+                                                    );
+                                                  })}
+                                                </tr>
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </td>
+                                      </tr>
                                     )}
-                                  </td>
-                                ))}
-                              </tr>
-                            </thead>
-                          </table>
-                        </div>
-                        <div className="mt-3 text-gray-800">
-                          {group.map((p1, idx1) =>
-                            group.slice(idx1 + 1).map((p2) => {
-                              const net1 = userScores[p1.name]?.[selectedRound]?.net || Array(18).fill(0);
-                              const net2 = userScores[p2.name]?.[selectedRound]?.net || Array(18).fill(0);
-                              let currentHole = -1;
-                              for (let i = 0; i < 18; i++) {
-                                if (net1[i] > 0 && net2[i] > 0) currentHole = i;
-                                else break;
-                              }
-                              const { points: projectedPoints, leader } = calculateProjectedPoints(p1.name, p2.name, currentHole);
-                              const finalPoints = calculateMatchPoints(net1, net2); // For completed matches
-                              const matchKey = `${groupIndex}-${p1.name}-${p2.name}`;
-                              return (
-                                <p key={matchKey}>
-                                  <strong>{p1.name} ({p1.teamName}) vs {p2.name} ({p2.teamName})</strong>
-                                  {currentHole < 17 ? (
-                                    <span>: Projected Points: {projectedPoints} for {leader} thru {currentHole + 1}</span>
-                                  ) : (
-                                    <span>: Points: {finalPoints} for {finalPoints === 1 ? p1.name : finalPoints === 0 ? p2.name : 'tie'}</span>
-                                  )}
-                                </p>
-                              );
-                            })
-                          )}
-                        </div>
+                                  </React.Fragment>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
                       </div>
                     );
                   })}
