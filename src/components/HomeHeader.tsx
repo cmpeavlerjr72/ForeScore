@@ -7,7 +7,7 @@ interface HeaderProps {
   title?: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ showNav = true }) => {
+const HomeHeader: React.FC<HeaderProps> = ({ showNav = true }) => {
   const [tripId, setTripId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,16 +32,7 @@ const Header: React.FC<HeaderProps> = ({ showNav = true }) => {
           <nav>
             <ul className="flex gap-6 text-sm md:text-base">
               <li>
-                <Link to="/profile" className="hover:underline">Profile</Link>
-              </li>
-              <li>
-                <Link to={`/dashboard/${tripId}`} className="hover:underline">Scoreboard</Link>
-              </li>
-              <li>
-                <Link to={`/round-scoreboard/${tripId}`} className="hover:underline">Rounds</Link>
-              </li>
-              <li>
-                <Link to={`/enter-scores/${tripId}`} className="hover:underline">Enter Scores</Link>
+                <Link to="/demo" className="hover:underline">Demo</Link>
               </li>
             </ul>
           </nav>
@@ -51,4 +42,4 @@ const Header: React.FC<HeaderProps> = ({ showNav = true }) => {
   );
 };
 
-export default Header;
+export default HomeHeader;

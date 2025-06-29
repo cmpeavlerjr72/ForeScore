@@ -11,6 +11,7 @@ const SetLineup: React.FC = () => {
   const [activeTab, setActiveTab] = useState('Teams');
   const [teamAssignments, setTeamAssignments] = useState<{ [teamIndex: number]: string[] }>({});
   const [matchPlaySelections, setMatchPlaySelections] = useState<{ [roundIndex: number]: { [groupIndex: number]: string[] } }>({});
+  const [nicknameMap, setNicknameMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchTrip = async () => {
@@ -41,6 +42,15 @@ const SetLineup: React.FC = () => {
         });
         setMatchPlaySelections(initialMatchPlay);
 
+        // Fetch nicknames for all users
+        const usernames = data.users || [];
+        const nicknames: Record<string, string> = {};
+        for (const username of usernames) {
+          const res = await fetch(`${SOCKET_URL}/users/${username}`);
+          const userData = await res.json();
+          nicknames[username] = userData.name || username; // Use 'name' as nickname, fallback to username
+        }
+        setNicknameMap(nicknames);
       } catch (err) {
         console.error('Failed to fetch trip data:', err);
       }
@@ -51,18 +61,18 @@ const SetLineup: React.FC = () => {
 
   const handleSaveLineup = async () => {
     if (!tripId) return;
-  
+
     // Convert to backend format
     const formattedTeams = tripData.teams.map((team: any, teamIdx: number) => ({
       name: team.name,
       players: teamAssignments[teamIdx].map((username: string, i: number) => ({
         id: i + 1,
-        name: username,
+        name: username, // Keep username for backend
         scores: Array(tripData.numRounds).fill(0),
         lineupOrder: Array(tripData.numRounds).fill(0),
       })),
     }));
-  
+
     const response = await fetch(`${SOCKET_URL}/trips/${tripId}/set-lineup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -71,7 +81,7 @@ const SetLineup: React.FC = () => {
         lineups: matchPlaySelections,
       }),
     });
-  
+
     if (response.ok) {
       alert('✅ Lineup saved!');
     } else {
@@ -132,7 +142,7 @@ const SetLineup: React.FC = () => {
                       <option value="">Select player</option>
                       {allUsers.map((user: string) => (
                         <option key={user} value={user}>
-                          {user}
+                          {nicknameMap[user] || user} {/* Display nickname or fallback to username */}
                         </option>
                       ))}
                     </select>
@@ -169,7 +179,7 @@ const SetLineup: React.FC = () => {
                             <option value="">Team {teamIdx + 1} Player</option>
                             {(teamAssignments[teamIdx] || []).map((user, idx) => (
                               <option key={idx} value={user}>
-                                {user}
+                                {nicknameMap[user] || user} {/* Display nickname or fallback to username */}
                               </option>
                             ))}
                           </select>

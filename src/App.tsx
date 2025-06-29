@@ -8,6 +8,7 @@ import PlayerScoreEntry from './pages/PlayerScoreEntry';
 import SetLineup from './pages/SetLineup';
 import { LoadingProvider } from './LoadingContext';
 import LoadingOverlay from './LoadingOverlay';
+import Demo from './pages/Demo';
 
 export interface EventConfig {
   tripId: string;
@@ -68,6 +69,7 @@ const App: React.FC = () => {
           <Route path="/profile" element={<Profile />} />
           <Route path="/enter-scores/:tripId" element={<PlayerScoreEntry />} />
           <Route path="/set-lineup/:tripId" element={<SetLineup />} />
+          <Route path="/demo" element={<Demo />} />
         </Routes>
       </Router>
     </LoadingProvider>

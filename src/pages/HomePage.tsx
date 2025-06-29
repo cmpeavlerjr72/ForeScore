@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
+import HomeHeader from '../components/HomeHeader';
 import Footer from '../components/Footer';
 import ForeScoreLogo from '../assets/ForeScore.png';
 import { useLoading } from '../LoadingContext';
@@ -115,7 +116,7 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#fdfdfb] flex flex-col">
-      <Header title="ForeScore" showNav={false} />
+      <HomeHeader title="ForeScore" showNav={true} />
       <main className="flex-grow container mx-auto flex flex-col items-center justify-center px-4 py-10 text-center">
         <img src={ForeScoreLogo} alt="ForeScore Logo" className="w-64 h-64 md:w-80 md:h-80" />
         <p className="text-lg text-gray-700 mb-6">Your Ultimate Golf Trip Scorekeeper</p>
