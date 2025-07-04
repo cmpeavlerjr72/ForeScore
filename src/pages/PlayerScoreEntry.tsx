@@ -174,7 +174,7 @@ const PlayerScoreEntry: React.FC = () => {
         throw new Error(`Failed to submit scores: ${res.status} - ${errorText}`);
       }
   
-      setMessage('✅ Scores submitted!');
+      alert('✅ Scores saved!');
       await fetchSavedScores(round);
     } catch (err: any) {
       console.error(err);
