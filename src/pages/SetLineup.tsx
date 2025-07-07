@@ -20,6 +20,7 @@ const SetLineup: React.FC = () => {
         const res = await fetch(`${SOCKET_URL}/trips/${tripId}`);
         const data = await res.json();
         setTripData(data);
+        console.log(data)
 
         // Initialize teamAssignments and matchPlaySelections
         const initialAssignments: { [teamIndex: number]: string[] } = {};

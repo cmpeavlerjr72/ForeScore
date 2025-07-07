@@ -57,13 +57,18 @@ export interface GolfCourse {
       handicap: [14, 12, 4, 18, 2, 8, 6, 16, 10, 9, 13, 3, 17, 5, 1, 7, 15, 11],
     },
     {
-        name: 'Chickasaw Point Golf Course',
-        par: [4, 5, 4, 3, 4, 5, 4, 3, 4, 4, 5, 4, 3, 4, 5, 4, 3, 4],
+      name: 'Chickasaw Point Golf Course',
+      par: [4, 5, 4, 3, 4, 5, 4, 3, 4, 4, 5, 4, 3, 4, 5, 4, 3, 4],
       handicap: [7, 9, 17, 15, 5, 11, 3, 13, 1, 10, 8, 6, 16, 14, 4, 12, 18, 2],
     },
     {
       name: 'Rocky Branch Golf Club',
       par: [4, 3, 4, 4, 5, 4, 4, 3, 5, 4, 4, 4, 4, 3, 5, 4, 3, 5],
     handicap: [8, 6, 4, 10, 2, 16, 14, 18, 12, 1, 17, 13, 5, 11, 3, 7, 15, 9],
-  },
+    },
+    {
+      name: 'Plantation Course at Edisto',
+      par: [4, 4, 3, 4, 5, 3, 4, 4, 4, 4, 4, 3, 4, 4, 4, 3, 4, 5],
+    handicap: [9, 13, 17, 3, 5, 7, 1, 11, 15, 2, 10, 18, 16, 6, 14, 8, 12, 4],
+    },
   ];

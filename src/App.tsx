@@ -36,7 +36,7 @@ export interface EventConfig {
 
 export const defaultEventConfig: EventConfig = {
   tripId: '',
-  numTeams: 2,
+  numTeams: 0,
   playersPerTeam: 4,
   numRounds: 3,
   scoringMethods: ['match', 'match', 'match'],

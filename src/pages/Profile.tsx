@@ -181,6 +181,7 @@ const Profile: React.FC = () => {
     };
   
     try {
+      console.log(completeConfig)
       const res = await fetch(`${SOCKET_URL}/trips`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
