@@ -190,7 +190,8 @@ const Profile: React.FC = () => {
       const tripResponse = await res.json();
   
       setShowSetupModal(false);
-      navigate(`/dashboard/${tempConfig.tripId}`, { state: { config: completeConfig } });
+      // navigate(`/dashboard/${tempConfig.tripId}`, { state: { config: completeConfig } });
+      navigate(`/profile/`)
     } catch (err: any) {
       console.error('Failed to save trip:', err.message);
       setError('Failed to save trip');
