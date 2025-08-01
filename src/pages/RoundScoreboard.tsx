@@ -100,6 +100,9 @@ const RoundScoreboard: React.FC = () => {
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
   const [nicknameMap, setNicknameMap] = useState<Record<string, string>>({});
+  const [expandedSkinsPlayer, setExpandedSkinsPlayer] = useState<string | null>(null);
+
+
 
   useEffect(() => {
     fetchTrip();
@@ -188,7 +191,19 @@ const RoundScoreboard: React.FC = () => {
             body: JSON.stringify({ round, projectedPoints: points }),
           });
         }
+      }     else if (scoringMethod === 'skins') {
+
+      const strokePoints = computeStrokePlayProjectedPoints(configData, scores, round);
+      for (const [username, points] of Object.entries(strokePoints)) {
+        console.log(`💾 Saving skins projected points for ${username} (Round ${round + 1}): ${points}`);
+        await fetch(`${SOCKET_URL}/users/${username}/trips/${tripId}/save-projected-points`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ round, projectedPoints: 0 }),
+        });
       }
+    }
+
     }
   };
 
@@ -576,6 +591,130 @@ const RoundScoreboard: React.FC = () => {
                       </table>
                     </>
                   )}
+                </>
+              ) : scoringMethod === 'skins' ? (
+                <>
+                  <h3 className="text-xl font-bold mb-4 text-[#0f172a]">Skins Leaderboard</h3>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm text-left border border-gray-300 rounded">
+                      <thead className="bg-gray-100 text-gray-800">
+                        <tr>
+                          <th className="p-2 border">Player</th>
+                          <th className="p-2 border">Total Skins Won</th>
+                          {Array.from({ length: 18 }, (_, i) => (
+                            <th key={i} className="p-2 border">H{i + 1}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {config.teams.flatMap(t => t.players).map((player) => {
+                          const netScores = userScores[player.name]?.[selectedRound]?.net || Array(18).fill(0);
+              
+                          // Determine hole-by-hole wins
+                          const skinsWon: boolean[] = Array(18).fill(false);
+                          const allScores = config.teams.flatMap(t => t.players.map(p => ({
+                            name: p.name,
+                            scores: userScores[p.name]?.[selectedRound]?.net || Array(18).fill(0),
+                          })));
+                          
+                          const skinsNumWon: number[] = Array(18).fill(0);
+                          let rollover = 1;
+              
+                          for (let h = 0; h < 18; h++) {
+                            const scoresThisHole = allScores.map(p => p.scores[h]).filter(s => s > 0);
+                          
+                            // Ensure all players have scores
+                            if (scoresThisHole.length === allScores.length) {
+                              const minScore = Math.min(...scoresThisHole);
+                              const winners = allScores.filter(p => p.scores[h] === minScore);
+                          
+                              if (winners.length === 1) {
+                                const winnerName = winners[0].name;
+                                if (winnerName === player.name) {
+                                  skinsNumWon[h] = rollover;
+                                }
+                                rollover = 1; // reset for next hole
+                              } else {
+                                rollover++; // no winner, roll over
+                              }
+                            }
+                          }
+              
+                          const totalSkins = skinsNumWon.reduce((sum, val) => sum + val, 0);
+
+              
+                          return (
+                            <React.Fragment key={player.name}>
+                              <tr className="border-t">
+                                <td
+                                  className="p-2 border cursor-pointer hover:underline"
+                                  onClick={() =>
+                                    setExpandedSkinsPlayer(expandedSkinsPlayer === player.name ? null : player.name)
+                                  }
+                                >
+                                  {nicknameMap[player.name] || player.name}
+                                </td>
+                                <td className="p-2 border font-bold">{totalSkins}</td>
+                                {skinsNumWon.map((num, i) => (
+                                  <td
+                                    key={i}
+                                    className={`p-2 border text-center ${
+                                      num > 0 ? 'bg-green-200 font-semibold' : 'text-gray-500'
+                                    }`}
+                                  >
+                                    {num > 0 ? `✔${num > 1 ? ` (${num})` : ''}` : '—'}
+                                  </td>
+                                ))}
+                              </tr>
+                          
+                              {expandedSkinsPlayer === player.name && (
+                                <tr className="border-t bg-gray-50">
+                                  <td colSpan={20} className="p-4">
+                                    <div className="overflow-x-auto">
+                                      <h4 className="font-semibold mb-2">
+                                        Scorecard for {nicknameMap[player.name] || player.name}
+                                      </h4>
+                                      <table className="min-w-full text-sm text-center border">
+                                        <thead className="bg-gray-200">
+                                          <tr>
+                                            <th className="p-2 border">Type</th>
+                                            {Array.from({ length: 18 }, (_, i) => (
+                                              <th key={i} className="p-2 border">H{i + 1}</th>
+                                            ))}
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          <tr>
+                                            <td className="p-2 border font-medium">Net</td>
+                                            {userScores[player.name]?.[selectedRound]?.net.map((score, i) => (
+                                              <td key={i} className="p-2 border">{score > 0 ? score : '–'}</td>
+                                            ))}
+                                          </tr>
+                                          <tr>
+                                            <td className="p-2 border font-medium">Raw</td>
+                                            {userScores[player.name]?.[selectedRound]?.raw.map((score, i) => (
+                                              <td key={i} className="p-2 border">{score > 0 ? score : '–'}</td>
+                                            ))}
+                                          </tr>
+                                        </tbody>
+                                      </table>
+                                      <button
+                                        onClick={() => setExpandedSkinsPlayer(null)}
+                                        className="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-1 rounded shadow"
+                                      >
+                                        Close
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                          
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </>
               ) : (
                 <div className="space-y-8">

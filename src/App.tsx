@@ -15,7 +15,7 @@ export interface EventConfig {
   numTeams: number;
   playersPerTeam: number;
   numRounds: number;
-  scoringMethods: ('match' | 'stroke')[];
+  scoringMethods: ('match' | 'stroke' | 'skins')[];
   courses: string[]; // Added to store selected courses for each round
   tripLeader?: string;
   users?: string[];

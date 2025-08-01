@@ -111,7 +111,7 @@ const Profile: React.FC = () => {
     setTempConfig((prev) => {
       if (name === 'scoringMethod' && index !== undefined) {
         const updated = [...prev.scoringMethods];
-        updated[index] = value as 'match' | 'stroke';
+        updated[index] = value as 'match' | 'stroke' | 'skins';
         return { ...prev, scoringMethods: updated };
       }
       if (name === 'course' && index !== undefined) {
@@ -314,6 +314,7 @@ const Profile: React.FC = () => {
                   >
                     <option value="match">Match Play</option>
                     <option value="stroke">Stroke Play</option>
+                    <option value="skins">Skins</option>
                   </select>
                 </div>
               ))}
